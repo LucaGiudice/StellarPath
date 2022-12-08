@@ -1,4 +1,4 @@
-# StellarPath: patient classifier <img src="https://raw.githubusercontent.com/LucaGiudice/supplementary-files/main/sp/Logo.png" width=350 align="right" style="border:4px solid black;" />
+# StellarPath: patient classifier <img src="https://raw.githubusercontent.com/LucaGiudice/supplementary-files/main/sp/Logo.png" width=350 align="right" />
 
 ## Brief description
 
@@ -27,7 +27,7 @@ StellarPath: Patient Classifier Integrates Multi-Omics in Patient Similarity Net
 
 ## Install
 
-*StellarPath* works with R but depends on a python module.
+StellarPath works with R but depends on a python module.
 You can install the R package with:
 
 ```r
@@ -47,6 +47,7 @@ You have to have conda installed in the system:
 - for a Windows-based system, Visual C++ Build Tools or Visual Studio Express must be installed to compile StellarPath for pip installation. The default python version used in our installation method is 3.8.12.
 
 Once conda is installed:
+
 For Windows, you need to run R as an administrator to make installation work properly. To do so, right click the RStudio icon (or R desktop icon) and select “Run as administrator” when launching R.
 
 ``` r
@@ -92,4 +93,4 @@ We will add other omics in the close future.
 
 ## License
 
-BSD-4-Clause @ Giudice Luca
+BSD-3-Clause @ Giudice Luca
