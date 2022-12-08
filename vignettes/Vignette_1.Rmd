@@ -1,0 +1,301 @@
+---
+title: "Vignette_1: Data Introduction with OGD_WT vs NORMOXIA_WT Mouse Study"
+output:
+  html_document:
+    theme: united
+    toc: yes
+  pdf_document:
+    toc: yes
+vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+body{ /* Normal  */
+      font-size: 18px;
+  }
+code.r{ /* Code block */
+    font-size: 14px;
+}
+</style>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  knitr::opts_chunk$set(warning = FALSE, message = TRUE)
+)
+```
+# StellarPath
+Welcome to the first vignette of our software StellarPath. 
+This vignette focuses on explaining the main operations and the data produced by StellarPath.
+
+## Brief introduction
+StellarPath classifies two patients'/samples' classes and works with both dense and sparse (e.g., somatic mutation) omics. It finds significantly deregulated and stable molecules toghether with their enriched pathways. It determines how much each pair of patients is similar by comparing the values of the molecules belonging to a specific pathway. It uses the pathway-specific similarities to build a patient similarity network (PSN). Only the PSNs, which show that one class is cohesive while the opposite one is not, are kept. StellarPath receives an unknown patient, adds it to a significant PSN and predicts its class with a graph convolutional network. The latter step is repeated with all PSNs and the final prediction is made by consensus. StellarPath provides multiple output data:
+
+1. markers: molecules, pathways and PSNs able to predict a patient's class
+2. new information: results of analysis and tests on the markers for their prioritization
+3. class signature PSNs representing a class being more cohesive and strong that the opposite one in term of a pathway specific regulation 
+4. patient's centralities: each patient is assigned to a pathway specific score that defines how much is similar to the member of its class and dissimilar to the non-members. Such score for each pathway/PSN allows to stratify a class of patients in subclasses.
+
+## Case study
+For this vignette, StellarPath is applied on a simple experimental study:
+
+* We have: Oxygen-Glucose deprived mouse samples and Normoxia samples.
+* We have: bulk RNA sequencing and small RNA sequencing for all the samples in study
+* We want: deregulated pathways and molecules due to the deprivation of Oxygen and Glucose in mouse.
+* We want: significant pathways and molecules being predictive of the samples' classes
+* We want: information to further prioritize and investigate pathways and molecules
+
+# Enviroment set up
+Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
+Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+
+```{r setup}
+
+#Clean workspace and memory ----
+rm(list=ls())
+gc()
+
+#Set working directory ----
+gps0=getwd()
+gps0=paste(gps0,"/%s",sep="")
+rootDir=gps0
+setwd(gsub("%s","",rootDir))
+
+#Load libraries ----
+library("StellarPath")
+library("qs")
+
+#Set variables ----
+#Input
+#Set the number of cores available in the system
+n_cores=15
+#output
+#Set the output file where all the data and results will be stored in the end
+out_res_path="classif_OGD.qs"
+```
+
+# Data set up
+StellarPath is a binary classifier and works with one or multiple omics from high-throughput sequencing describing the two patient classes in comparison.
+
+```{r data set up}
+#Load and set up the example data ----
+data("ogd_l")
+
+#Set name of the project, the specie id of the samples, the name of the classes to compare (case vs control)
+name_dataset="OGD"
+tax_id=10090
+groups=c("OGD_WT","N_WT")
+
+#Dataframe about samples' ids and classes
+ogd_l$info
+
+#bulkRNAseq expression matrix
+see(ogd_l$mRNA)
+
+#smallRNAseq expression matrix
+see(ogd_l$miRNA)
+  
+```
+
+# Running Time and RAM Memory
+StellarPath's package includes functions to monitor the running time and the RAM usage of the classification
+
+```{r monitor}
+#Start monitor RAM memory
+log_path=start_monitor_ram(name_dataset)
+#Start monitor running time
+startTime=Sys.time()
+```
+
+# Input data check up and preparation 
+We provide to StellarPath the info dataframe, the name of the classes to compare and the raw count matrices.
+StellarPath analyses omics from their normalization to integration in pathways without the need of a pre-processing.
+
+```{r data check up}
+#Check input data and prepare object for downstream workflow
+data_l=prepare_data(info = ogd_l$info,
+                    groups_name = groups,
+                    mRNA = ogd_l$mRNA,
+                    miRNA = ogd_l$miRNA,
+                    tax_id = tax_id,
+                    n_cores = n_cores)
+```
+
+# Cross-validation (CV)
+In the data preparation, StellarPath divides the patients into three sets called training, validation, and testing.
+
+* Training patients are known examples of the classes, are used to find predictive features (molecules, pathways, and networks) and to train the artificial neural network (ANN) in classifying. 
+* Validation patients are also known but are used only to test if the trained ANN classifies correctly or needs to be re-trained. 
+* Testing patients are considered unknown, are introduced only when the training phase is finished and are used to test the final version of the ANN for simulating a real application. 
+
+The real testing patient’s classes are then compared to the predicted ones to determine the classification performances. In case of high performances, the features used to train the ANN can be considered markers and investigated. 
+
+```{r data preparation}
+#data_l is a list, each element contains the data for a specific run of cross-validation
+names(data_l)
+
+#Info dataframe of training patients involved in the first run of cross-validation
+see(data_l$`1`$TRAINING$info)
+
+#Omics have been automatically normalized (notice how only training patients' data are present)
+#Gene expression
+see(data_l$`1`$TRAINING$omics$gex)
+
+#LncRNA expression
+see(data_l$`1`$TRAINING$omics$lncRNA)
+
+#miRNA expression
+see(data_l$`1`$TRAINING$omics$miRNA)
+
+#data_l includes also the pathway databases that will be used to build the PSNs
+names(data_l$`1`$TRAINING$databases)
+```
+
+# Omics analysis and Feature selection
+StellarPath performs the following operations:
+
+1. It analyses each ome alone to determine molecules that are both significantly differentially expressed (DE) and differentially stable between the classes. 
+2. It combines the lists of significant and deregulated molecules to find the pathways which are significantly over-represented. As result, a pathway can be selected when enriched either by the same type of deregulated molecules or by diverse types (e.g., regulatory network with a DE lncRNA that regulates a DE miRNA that regulates a DE gene).
+3. It builds pathway specific PSNs. It considers an enriched pathway and determines how much each pair of training patients is similar. After the creation, PSNs and their pathways are kept only if signature of one class; this criterium is satisfied when one class has patients who are more similar than the members of the opposite group and the two classes are not similar. 
+
+```{r data analysis}
+#Find the pathways that in the training data produce a significant PSN
+data_l=analyse_training(data_l)
+```
+
+# Classification
+The signature PSNs are used to train a graph convolutional network (GCN) (variant of ANN). The validation patients are then included into the PSNs and the trained GCN predicts their class based on their similarity with the training patients. StellarPath helps the training of the GCN by filtering out the PSNs which do not correctly predict the validation patients. After the training, the testing patients are included, and their class predicted.  
+
+```{r classification}
+#Classify the testing patients based on the features/pathways learnt from the training
+data_l=classify_testing(data_l)
+
+#End monitor resources
+runningTime=convert_min2h(difftime(Sys.time(), startTime, units='mins')[[1]])
+max_ram=get_max_ram_used(log_path)
+resources_l=list(runningTime=runningTime, max_ram=max_ram)
+#Update the performance list
+data_l$performances$performances$name_dataset=name_dataset
+data_l[["performances"]]=c(data_l[["performances"]],resources_l)
+
+#Running time
+cat("Classification performed in", runningTime, "hours and with", max_ram, "GB of RAM")
+```
+
+## Performances
+Let's have a look at the method's performances in term of classification, features and system usage.
+
+### PSNs predictions
+StellarPath tracks how much the GCN has been good in predicting correctly validation and testing patients with each pathway specific PSN (selected during the training phase). The binary classification metric used by StellarPath for evaluating the quality of the predictions is the Matthews correlation coefficient (10.1186/s12864-019-6413-7). MCC ranges from -1 to 1. Coefficient equal to 1 means that the GCN has predicted correctly the patient's classes. Coefficient equal to -1 means that the GCN has predicted every patient wrongly.
+
+* validation_MCC: MCC regarding the GCN predictions of validation patients
+* test_MCC: MCC regarding the GCN predictions of testing patients
+
+```{r PSN performances, results='asis'}
+#MCC performance measure for each selected PSN with respect both validation and testing patients
+knitr::kable(data_l$`1`$TESTING$classification$perfsXpathway_df[1:10,])
+```
+
+### Major Voting predictions
+The GCN predicts the testing patients with each pathway specific PSN.
+StellarPath makes the final prediction about the class of a testing patient with the major voting approach.
+It assigns to a testing patient the class that has been predicted most frequently.
+It is possible to see the classification performances of the major voting predictions:
+
+* name_dataset: it is the time of the run
+* mcc_scores: MCC values for each run of CV
+* runs: identifier of the CV run
+
+```{r MV performances, results='asis'}
+#MCC performance measure for each selected PSN with respect both validation and testing patients
+knitr::kable(data_l$performances$performances)
+```
+
+# Enrichment
+Once the classification has been completed, there is an enrichment phase where StellarPath:
+
+1. uses the classification results and associates validation and testing patients to their "predicted" classes
+2. applies a new step of feature selection to find molecules, pathways and PSNs significantly differentiating the classes in study with all the patients
+3. the found features (molecules, pathways and PSNs) are the final predictive findings that StellarPath provides
+
+In this way, StellarPath aligns the classification findings with the significant biological features (molecules, pathways and PSNs) that reports to the final user. This also helps to avoid of selecting the final features based on their statistics obtained in different CV runs with spurious criteria.
+
+The features provided by the enrichment will be both predictive and also significantly different between the classes in comparison including the "new predicted" patients.
+ 
+```{r enrichment}
+#Retrieve best pathways/target sets and their PSNs used in the classification
+data_l[["enrichment"]]=enrichment_analysis(data_l)
+#Save results
+qsave(data_l,file = out_res_path, nthreads = n_cores)
+```
+
+# Predictive and Biologically Signficant Features
+Here, we have a look to the results of the enrichment
+
+## Specific Differential Role/Expression Analysis
+
+1. logFoldChange: measures the change in count values between first vs second class
+2. Stability: measures how much is differently stable in first vs second class (higher positive and more is stable for first class)
+3. Activity_1: shows the mean of the count values (expression) in the first class
+4. Activity_2: shows the mean of the count values (expression) in the second class
+5. Stable_for: indicates in which sample group the molecule is stable for
+6. Significant: indicates if the molecule has been found significant
+7. Barcode: is an internal variable used by the software to understand which test the molecule has passed to be significant
+
+```{r molecules, results='asis'}
+#StellarPath provides a table of statistics related to the molecules in the ome
+#logFoldChange: standard ratio
+knitr::kable(data_l$enrichment$omics$gex$SDR[1:5,])
+```
+
+## Pathway Analysis
+
+top_pathways_df is a dataframe with info and statistics about the significant pathways and their corresponding PSN
+top_pathways_df presents only pathways that passed the test of enrichment and their PSN passed the topological test
+
+1. pathway name
+2. freq: refers to the number of significant molecules/elements belonging to the pathway
+3. regulation: refers to the direction of enrichment, in case the molecules belonging to the pathway have count values which are greater in the strongest class than in the opposite class of the network then it is "activated"
+4. group: indicates the class of nodes being significantly more similar than the opposite class in comparison
+5. power: indicates from 1 to 10 how much the strongest class is more cohesive than the non-members
+6. min_intra_STRONG: is the minimum similarity between the members of the strongest class which is greater than the opposite class's intrasimilarities and the interclass similarities
+7. max_intra_WEAK: is the maximum similarity between the members of the weakest class which is lower than the opposite class's intrasimilarities and the interclass similarities
+8. max_inter_similarities: is the maximum similarity between members of the two classes 
+
+
+```{r pathways, results='asis'}
+#StellarPath provides a table of statistics related to the pathways enriched by the signifcant molecules
+knitr::kable(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_df[1:5,])
+```
+
+top_pathways_l is a list where each element contains all the data about a significant pathway specific PSN
+top_pathways_l is aligned with top_pathways_df and for each element/pathway there are the following info:
+1. set: contains the significant molecules belonging to the pathway
+2. set_counts: is the count matrix (e.g. genes per samples) with only the count values of the significant molecules belonging to the pathway
+3. stats: is a dataframe indicating the statistics of the pathway
+4. centrality: is a dataframe s.t. for each sample indicates how much is strongly similar in its groups vs its not group
+5. orig_set: contains all the original elements of the pathway
+
+For example, given a pathway of interest, we can have a look to the stats of its significant molecules:
+
+```{r PSN table, results='asis'}
+#StellarPath provides access to the PSN associated to the pathway
+markers=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l$HALLMARK_UV_RESPONSE_UP$set
+knitr::kable(data_l$enrichment$omics$gex$SDR[markers,])
+
+```
+
+## PSN plot
+
+```{r PSN plot}
+#StellarPath provides access to the PSN associated to the pathway
+PSN=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l$HALLMARK_UV_RESPONSE_UP$PSN
+pl_l=plot_PSN(ogd_l$info,PSN,edge_threshold = 0.3,GLratio = 3)
+
+```

@@ -1,0 +1,309 @@
+---
+title: 'Vignette_2: Data Visualization with TCGA KIRP LATE vs EARLY stage patients'
+output:
+  html_document:
+    theme: united
+    toc: yes
+  pdf_document:
+    toc: yes
+vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+body{ /* Normal  */
+      font-size: 18px;
+  }
+code.r{ /* Code block */
+    font-size: 14px;
+}
+</style>
+
+```{r, include = FALSE}
+#https://bookdown.org/yihui/rmarkdown/html-document.html
+#https://stackoverflow.com/questions/30446905/rmarkdown-font-size-and-header
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  knitr::opts_chunk$set(warning = FALSE, message = TRUE)
+)
+```
+# StellarPath
+Welcome to the second vignette of our software StellarPath. 
+This vignette focuses on visualizing the data produced by StellarPath.
+We hope to provide some ideas on how to investigate and elaborate our method's results.
+
+## Note
+Before checking this vignette, we suggest to go through Vignette_1.
+In this vignette, we will not describe each operation and the workflow.
+For some plots, we will limit the data to plot to create figures that fit in the html vignette.
+In a real application, we suggest to not subsample the data but to produce the plot in an independent pdf.
+
+## Case study
+For this vignette, StellarPath is applied on a simple experimental study:
+
+* We have: Kidney renal papillary cell carcinoma patient's samples divded by cancer stage: LATE vs EARLY
+* We have: bulk RNA sequencing, small RNA sequencing and somatic mutation data for all the samples in study
+* We want: deregulated pathways and molecules between LATE and EARLY cancer stage
+* We want: information to further prioritize and investigate pathways and molecules
+* We want: find a predictive pathway for EARLY cancer stage patients and check up the patient's similarities
+* We want: find molecular markers for EARLY cancer stage patients
+* We want: check up the pathway activity of all the patients in the significant pathway specific PSNs to detect subclasses
+
+# Enviroment set up
+Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
+Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+
+```{r setup}
+
+#Clean workspace and memory ----
+rm(list=ls())
+gc()
+
+#Set working directory ----
+gps0=getwd()
+gps0=paste(gps0,"/%s",sep="")
+rootDir=gps0
+setwd(gsub("%s","",rootDir))
+set.seed(5)
+
+#Load libraries ----
+library("StellarPath")
+library("qs")
+library("data.table")
+library("ggplot2")
+library("pheatmap")
+library("ggrepel")
+
+#Set variables ----
+#Input
+#Set the number of cores available in the system
+n_cores=15
+#output
+#Set the output file where all the data and results will be stored in the end
+out_res_path="classif_KIRP.qs"
+```
+
+# Data set up
+StellarPath is a binary classifier and works with one or multiple omics from high-throughput sequencing describing the two patient classes in comparison. For this vignette, we load the TCGA data that StellarPath includes in the package and extract the information about KIRP patients. Then, we run the main workflow on KIRP data.
+
+```{r workflow}
+#Load and set up the example data ----
+data("tcga_p2_l")
+tcga_l=tcga_p2_l
+
+#Set name of the project, the specie id of the samples, the name of the classes to compare (case vs control)
+name_dataset="KIRP"
+tax_id=9606
+groups=c("LATE","EARLY")
+
+#Start monitor RAM memory
+log_path=start_monitor_ram(name_dataset)
+#Start monitor running time
+startTime=Sys.time()
+
+data_l=prepare_data(info = tcga_l[[name_dataset]]$info[,c("patientID","pathologic_stage_binary")],
+                    groups_name = c("LATE","EARLY"),
+                    mRNA = tcga_l[[name_dataset]]$omics$RNASeq2Gene, 
+                    miRNA = tcga_l[[name_dataset]]$omics$miRNASeqGene,
+                    mutations = tcga_l[[name_dataset]]$omics$Mutation,
+                    tax_id = tax_id,
+                    n_cores = n_cores);tmp=gc();
+
+#Find the pathways that in the training data produce a significant PSN
+data_l=analyse_training(data_l)
+
+#Classify the testing patients based on the features/pathways learnt from the training
+data_l=classify_testing(data_l)
+
+#End monitor resources
+runningTime=convert_min2h(difftime(Sys.time(), startTime, units='mins')[[1]])
+max_ram=get_max_ram_used(log_path)
+resources_l=list(runningTime=runningTime, max_ram=max_ram)
+#Update the performance list
+data_l$performances$performances$name_dataset=name_dataset
+data_l[["performances"]]=c(data_l[["performances"]],resources_l)
+
+#Running time
+cat("Classification performed in", runningTime, "hours and with", max_ram, "GB of RAM")
+
+#Retrieve best pathways/target sets and their PSNs used in the classification
+data_l[["enrichment"]]=enrichment_analysis(data_l)
+
+#Save results
+qsave(data_l,file = out_res_path, nthreads = n_cores)
+
+```
+
+# Data Extraction
+Let us extract the data and results produced by StellarPath
+
+```{r data extraction}
+#Extract stable differential expression analysis about molecules (e.g. genes)
+sdr=data_l$enrichment$omics$gex$SDR
+
+#Extract and format the classification performance of the GCN with each significant pathway specific PSN
+perfsXpathway_dfs=rbindlist(data_l$performances$perfsXpathway_dfs)
+
+#Extract and format the significant pathway specific PSN
+transc=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_df
+muts=data_l$enrichment$pathway_analysis$mutations$top_pathways_df
+muts_extra=data.frame(code_db=rep(NA,nrow(muts)),
+                      name_db=rep(NA,nrow(muts)),
+                      pathways_targets=rep(NA,nrow(muts)),
+                      code_db_targets=rep(NA,nrow(muts)))
+muts=cbind(muts,muts_extra)
+paths=rbind(transc,muts)
+
+#Extract how much each patient is central in the pathway specific PSNs of the transcriptomics data
+centralities=sapply(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l,function(x){
+  as.numeric(x$centrality)
+})
+rownames(centralities)=names(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[1]]$centrality)
+centralities=t(centralities)
+
+
+```
+
+# Plot
+We can now start to produce the plots to visualize the data and results about the classification and the patients.
+
+## GCN performance per PSN
+We want to understand how much the GCN performed with each pathway specific PSN.
+
+```{r performances, out.width = "100%", fig.align = "center"}
+
+perfsXpathway_dfs$dataset=name_dataset
+perfsXpathway_dfs$method="StellarPath"
+ggplot(perfsXpathway_dfs, aes(x=dataset, y=test_MCC, fill=method)) + 
+  geom_violin(color="grey35",lwd=0.3,scale="width") +
+  scale_fill_manual(values = c('#f6b45e','#365b9f')) +
+  theme(text = element_text(size=7)) +
+  labs(y = "Matthews correlation coefficient", x="TCGA datasets") +
+  facet_grid(~ dataset, scales = "free") +
+  theme(axis.ticks.x=element_blank(), axis.text.x=element_blank()) +
+  ylim(0.5, 1)
+```
+We can say that the GCN managed to predict very good the testing patients in most of the significant pathway specific PSNs involved in the different runs of cross-validation. This means that we can consider the results coming out this classification because pathways and molecules will be both deregulated and predictive.
+
+## Pathway Ranking
+We plot the statistics of the significant pathway specific PSNs.
+This plot allows to summarize the most important statistics about PSNs and let us prioritize which pathways to study further.
+Precisely, we plot:
+
+* Separability Power: (how much the classes in study are separated in the PSN and how much one class is cohesive while the second one is sparse)
+* Group: the patient's class that is cohesive in the PSN and also the class whose molecular markers are deregulated in the pathway
+* Regulation Type: if the pathway is activated or inhibited by the deregulated molecules of the cohesive class
+* Group's cohesion: indicates the smallest similarity between the patients of the cohesive class
+
+```{r ranking, results='asis', out.width = "100%", fig.align = "center", message=FALSE}
+x=paths[1:50,]
+x=x[order(x$power,decreasing = FALSE),]
+x$pathways=factor(x$pathways,ordered = TRUE,levels = x$pathways)
+ggplot(x, aes(y=pathways, x=power, color=regulation, shape=group, size=min_intra_STRONG)) +
+  geom_point() + theme_bw() + 
+  scale_color_manual(breaks = c("activated", "inhibited"), values=c("red", "blue")) +
+  labs(x="PSN's Separability Power", y="Pathway specific PSNs", 
+       color="Regulation Type", size="PSN's Class\ncohesion") +
+  theme(text = element_text(size=7)) +
+  scale_size(range = c(0, 2))
+```
+
+## PSN graph plot
+From the previous plot, we see that EARLY cancer stage patients have activated the pathway "CELL KILLING" probably to limit the proliferation of the tumor. We want to see precisely the EARLY patients that have activated the pathway, so we plot the network.
+
+```{r PSN, results='asis', out.width = "100%", fig.align = "center", message=FALSE}
+#Extract informaiton about a pathway specific PSN of interest
+path_name="REGULATION OF CELL KILLING"
+knitr::kable(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$stats)
+
+PSN=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$PSN
+info=data_l$enrichment$info
+pl_l=plot_PSN(info,PSN,k_clusters = 13,edge_threshold = 0.3,GLratio = 3)
+```
+It seems that the following EARLY patients are quite important for their class:
+
+* EARLY.86
+* EARLY.9
+* EARLY.77
+* EARLY.1
+* EARLY.73
+
+While it seems that the patient EARLY.75 is not regulating the CELL KILLING as the other EARLY patients.
+At this point, we want to remember that StellarPath function represents only few patients in the network to visualize.
+This means that there can be other patients behind EARLY.75, let's see them.
+
+```{r PSN outliers, results='asis'}
+pl_l$names_in_k_l$EARLY.79
+```
+
+If we want to get the original names of the patient's samples which can be outliers for the CELL KILLING pathways:
+
+```{r PSN original names, results='asis'}
+plyr::mapvalues(pl_l$names_in_k_l$EARLY.79, from=info$IDs, to=rownames(info), warn_missing = FALSE)
+```
+
+## Molecular Markers
+We plot the statistics of the significant molecules that StellarPath found deregulated in expression and stability in the CELL KILLING pathway.
+This plot allows to summarize the most important statistics about the deregulated molecules and let us prioritize which molecules to study further.
+Precisely, we plot:
+
+* logFoldChange: how much the molecule is deregulated in term of expression values in the comparison LATE vs EARLY
+* Stability: how much the molecule is deregulated in term of variance of the expression values in the comparison LATE vs EARLY (more the value is lower and more the molecule has a more stable expression in EARLY patients)
+* Activity_EARLY: Relative expression value of the molecule in the EARLY class
+
+```{r Markers, results='asis',out.width = "100%", fig.align = "center", message=FALSE}
+#Extract the set of molecules that enriched the pathway of interest
+mls=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$set
+#Extract the stats about the molecules
+sdr_mls=sdr[mls,]
+sdr_mls$names=rownames(sdr_mls)
+
+ggplot(sdr_mls, aes(y=logFoldChange, x=Stability, color=Activity_EARLY)) +
+  geom_point() + theme_bw() +
+  labs(x="Stability", y="logFoldChange", 
+       color="Relative expression\n in EARLY class") +
+  theme(text = element_text(size=7)) +
+  geom_label_repel(aes(label = names),
+                   box.padding   = 0, 
+                   point.padding = 0.1,
+                   size = 5, alpha=0.8, max.overlaps=5, label.size = NA, fill = "white",
+                   segment.color = 'grey50')
+```
+The gene STAP1 seems to be the most important deregulated markers in the CELL KILLING pathway for EARLY cancer stage patients.
+It is actually involved with their pathology: https://www.proteinatlas.org/ENSG00000035720-STAP1/pathology
+
+## Centralities in pathway specific PSNs
+In the end, we also want to plot how much each patient is central in each pathway specific PSN.
+This plot allows to understand if there are subclasses inside the classes in study or there are outliers.
+For example, we have suclasses of LATE cancer stage patients if a large subset of patients is central in only some pathways and not central in others. We don't have subclasses if LATE cancer stage patients are all central in all the significant pathways. We have outlier patients if a small subset of LATE patients is not central in only some pathways.
+
+```{r centralities, out.width = "160%", fig.align = "center"}
+#We set up the annotation dataframe for the columns/samples in order to see their class in the plot
+classes=sub("\\..*", "",colnames(centralities))
+anno=data.frame(ids=colnames(centralities),classes=classes,samples="NA")
+rownames(anno)=anno$ids
+anno=anno[,-1]
+
+#We plot a subset of the centrality matrix to simplify the plot for the vignette
+pheatmap(
+  centralities[1:100,sample(seq(1,ncol(centralities)))[1:70]], scale = "row",
+  main=paste("StellarPath patient's centralities:",name_dataset),
+  fontsize=8,
+  fontsize_row=3.5,
+  fontsize_col=3.5,
+  angle_col=45,
+  annotation_col = anno
+)
+```
+
+At the same time, we can see already that there are clearly two subclasses in both LATE and EARLY cancer stage patients.
+Analysing the centrality matrix with clustering techniques could further allow us to be more specific, detect the subclasses and distinguish them based on the pathways.
+
+
+
+
