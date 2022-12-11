@@ -34,7 +34,6 @@ You can install the R package with:
 devtools::install_github(
   repo="LucaGiudice/StellarPath",
   ref="main",
-  auth_token = "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",
   dependencies = "Depends",
   build_vignettes = FALSE
 )
