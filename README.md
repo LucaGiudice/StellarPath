@@ -40,27 +40,23 @@ devtools::install_github(
 ```
 
 Once the R package is installed, you can install the Python module.
+The python version used to develop the method has been the 3.8.12.
 
-You have to have conda installed in the system:
-- if you don't have conda then you can install miniconda from <https://conda.io/miniconda.html>.   
-- if you already have any version of conda, you can skip this step. You can check it by entering `conda --version` in the Terminal.
-- for a Windows-based system, Visual C++ Build Tools or Visual Studio Express must be installed to compile StellarPath for pip installation. The default python version used in our installation method is 3.8.12.
+- For non Windows-based systems, you need to install python 3 and conda/miniconda <https://conda.io/miniconda.html>.
+- For Windows-based system, you need to use Visual Studio, install python 3 and conda/miniconda.
 
-Once conda is installed:
-
-For Windows, you need to run R as an administrator to make installation work properly. To do so, right click the RStudio icon (or R desktop icon) and select “Run as administrator” when launching R.
+Once conda is installed, our R package include two functions to install a python enviroment linked to the package:
 
 ``` r
+#For Windows-based system, run R as administrator to make installation work properly
 library("StellarPath")
-SP_install() #check conda, if conda is missing installs miniconda, then it installs the python enviroment
+SP_install() #check conda, if conda is missing installs automatically miniconda, then it installs the python enviroment
 SP_initialize(save_profile = TRUE) #activate the conda enviroment
 ```
 
 **In case of any installation issue:**
 
-We suggest you to use the docker called: ***lgiudice/py3_r4_bioinf:latest***
-
-The docker has an Ubuntu OS that is suited to install and work with StellarPath.
+We suggest to use the docker: ***lgiudice/py3_r4_bioinf:latest***. It has an Ubuntu OS that is suited to install and work with StellarPath.
 
 ## Vignettes
 
