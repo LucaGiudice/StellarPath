@@ -1,0 +1,334 @@
+---
+title: "Vignette_5: StellarPath vs GSEA (traditional enrichment tool)"
+output:
+  html_document:
+    theme: united
+    toc: yes
+vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{=html}
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+body{ /* Normal  */
+      font-size: 18px;
+  }
+code.r{ /* Code block */
+    font-size: 14px;
+}
+</style>
+```
+
+```{r, include = FALSE}
+#https://bookdown.org/yihui/rmarkdown/html-document.html
+#https://stackoverflow.com/questions/30446905/rmarkdown-font-size-and-header
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  knitr::opts_chunk$set(warning = FALSE, message = TRUE)
+)
+```
+# StellarPath compared to GSEA
+Welcome to the fifth vignette of our software StellarPath. 
+This vignette focuses on comparing StellarPath with GSEA (a traditional pathway analysis tool).
+We hope to convince you in using StellarPath for your pathway analysis.
+
+## Note
+Before checking this vignette, we suggest to go through the previous vignettes describing workflow, data and results.
+In this vignette, we will skip the explanations about operations and focus on the comparison between the two methods.
+
+Keep in mind that, it is challenging to make a definitive quantitative and qualitative comparison between StellarPath and all the other pathway analysis tools like GSEA. Firstly because StellarPath solves a problem different from a functional enrichment tool, secondly because each enrichment tool has its unique strengths and weaknesses, and thirdly because the choice of tool often depends on the specific requirements of the analysis and user’s preferences. 
+
+For example, Gene Set Enrichment Analysis (GSEA) developed by the Broad Institute and StellarPath are both computational methods that identify significant pathways in biological datasets. However, they employ different strategies and have unique features that make them suitable for different types of analyses. Here are the key differences:
+
+1.	Input Data: GSEA considers all genes in the dataset, regardless of their expression levels. This approach allows GSEA to detect all changes in gene expression that might be missed when focusing only on differentially expressed genes. On the other hand, StellarPath focuses only on differentially expressed genes. This approach can be more sensitive to significant changes in gene expression that are relevant to the biological state or condition under study.
+2.	Statistical Testing: GSEA uses permutation testing to compare the observed enrichment score of a pathway against a null distribution. This method can control for type I errors (false positives) and is robust against variations in gene set sizes. In contrast, StellarPath uses over-representation analysis (ORA) to test whether a pathway is enriched with differentially expressed genes. Additionally, StellarPath checks that the pathway-specific patient similarity network (PSN) representing a gene set is also topologically relevant because it separates the two classes under comparison.
+3.	Pathway Significance: GSEA is likely to find more significant pathways because a pathway needs to pass only one test (the permutation test). This approach can provide a broad overview of the biological processes involved. However, StellarPath is likely to find fewer significant sets because a pathway has to meet several criteria: it must include differentially expressed genes, pass the ORA test, and produce a PSN that separates the patient classes under study. 
+4.	Output Data: GSEA provides the genes, a probability value, an enrichment score associated to each pathway. StellarPath provides the differentially expressed genes, the cohesive patient class, the separability power, the PSN, how much each patient is important for the connectivity of its class, the classification performances and how the pathway is regulated.
+
+## Case study
+For this vignette, StellarPath is applied on a simple experimental study:
+
+* We have: Oxygen-Glucose deprived mouse samples (OGD WT) and Normoxia samples (N WT).
+* We have: bulk RNA sequencing and small RNA sequencing for all the samples in study
+* We want: Apply StellarPath and get deregulated pathways between OGD WT and N WT
+* We want: Apply GSEA and get deregulated pathways between OGD WT and N WT
+* We want: Find which significant pathways are unique of StellarPath, GSEA and which are common between them
+* We want: Discuss overlaps and uniqueness
+
+# Enviroment set up
+Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
+
+* Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+* Be careful: this vignette requires extra packages for GSEA data
+
+
+```{r setup}
+
+#Clean workspace and memory ----
+rm(list=ls())
+gc()
+
+#Set working directory ----
+gps0=getwd()
+gps0=paste(gps0,"/%s",sep="")
+rootDir=gps0
+setwd(gsub("%s","",rootDir))
+set.seed(8)
+
+#Load libraries ----
+library("StellarPath")
+library("qs")
+library("data.table")
+library("dplyr")
+library("fgsea")
+library("writexl")
+library("limma")
+library("edgeR")
+
+#Set variables ----
+#Input
+#Set the number of cores available in the system
+n_cores=15
+#output
+#Set up a list that will contain the pathways found by StellarPath and GSEA
+paths_l=list()
+#Set the output file where all the data and results will be stored in the end
+out_res_path="StellarPath_vs_GSEA.qs"
+```
+
+# StellarPath run
+For this vignette, we load the mouse data that StellarPath includes in the package and extract the information about the samples.
+Then, we run the main workflow of StellarPath on the data.
+
+```{r workflow}
+#Load and set up the data ----
+data("ogd_l")
+
+#Set name the specie id of the samples, the name of the classes to compare (preferably case vs control)
+tax_id=10090
+groups=c("OGD_WT","N_WT")
+
+#Check input data and prepare object for downstream workflow
+data_l=prepare_data(info = ogd_l$info,
+                    groups_name = groups,
+                    gex = ogd_l$mRNA,
+                    miRNA = ogd_l$miRNA,
+                    tax_id = tax_id,
+                    n_cores = n_cores);tmp=gc();
+
+#Find the pathways that in the training data produce a significant PSN
+data_l=analyse_training(data_l)
+
+#Classify the testing patients based on the significant pathway-based PSNs
+data_l=classify_testing(data_l)
+
+#Retrieve best significant pathway-based PSNs with the predicted samples and the training results (best predictive markers)
+data_l=enrichment_analysis(data_l)
+#Extract best pathways (we don't all the pathways' meta-information for the downstream analysis)
+sp_res=unique(data_l$enrichment$pathway_analysis$top_pathways_df)
+sp_res=sp_res[sp_res$pathway_type!="miRNA_targets",]
+sp_res=unique(sp_res[order(sp_res$regulation),c(1,2,4,5,6)])
+paths_l[["SP_pathways"]]=sp_res
+```
+
+# GSEA input data
+
+GSEA does not work on multi-omics dataset, requires normalized gene expression matrix, the t-statistic of a differential expression analysis, and a list containing the gene sets. Therefore, we extracted the pathway list from StellarPath package and normalized the gene expression matrix describing OGD WT and N WT samples. We opted to apply Limma+EdgeR workflow for both the matrix normalization and the differential expression analysis, as it was also the one applied by the original author. 
+
+```{r GSEA data}
+
+data("dbs_mmu_paths_l")
+counts=ogd_l$mRNA
+group=ogd_l$info$group
+
+#Make the design matrix
+bin_contrast <- ifelse(group == "OGD_WT", 1, 0)
+design=cbind(bin_contrast,ifelse(bin_contrast == 1, 0, 1))
+colnames(design)=c("CA","CO");rownames(design)=seq(1,nrow(design))
+design[,1]=as.numeric(design[,1]);design[,2]=as.numeric(design[,2])
+contr.matrix <- makeContrasts(
+  CAvsCO = CA-CO, 
+  levels = colnames(design))
+
+#Create edgelist object and compute L and M variables
+x=DGEList(counts = counts, group = group, remove.zeros = TRUE)
+
+#Remove genes which are low expressed and non informative of the difference between groups
+keep.exprs <- filterByExpr(x, group=group)
+x <- x[keep.exprs,, keep.lib.sizes=FALSE]
+
+#Normalize data by library size
+x <- calcNormFactors(x, method = "TMM")  
+mcpm <- cpm(x, log=FALSE);
+lcpm = cpm(x, log=TRUE)
+
+#Compute DE analysis
+vfit <- lmFit(lcpm, design=design)
+vfit <- contrasts.fit(vfit, contrasts=contr.matrix)
+efit <- eBayes(vfit)
+tT_ov=topTable(efit,p.value=1,adjust.method="bonferroni",number=Inf)
+
+```
+
+# GSEA run
+
+Gene Set Enrichment Analysis (GSEA) is a computational method that identifies whether an a priori defined set of genes shows statistically significant, concordant differences between two biological states, such as phenotypes. The GSEA software, implemented by the Broad Institute, offers two methods for gene set enrichment analysis: label-permuting GSEA and preranked GSEA.
+
+## Label-permuting GSEA 
+
+It is the standard method that involves three main steps:
+
+1. Calculation of the Enrichment Score (ES): This score represents the degree to which a gene set is overrepresented at the extremes (top or bottom) of a ranked list of genes. The ES is calculated by walking down the list of genes, increasing a running-sum statistic when a gene is in the gene set and decreasing it when it is not. The magnitude of the increment depends on the correlation of the gene with the phenotype. The ES is the maximum deviation from zero encountered in the walk, which corresponds to a weighted Kolmogorov-Smirnov-like statistic.
+2. Estimation of the statistical significance of the ES: This is achieved by a permutation test. In the label-permuting procedure, the phenotype labels are permuted, which preserves gene-gene correlations. This method maintains the complex correlation structure of the genes, but it might be too conservative if you have a small number of samples in one of your phenotype groups.
+3. Calculation of the false discovery rate (FDR): This step corrects for multiple hypothesis testing.
+
+Label-permuting GSEA calculates the ES directly from the original dataset. It uses a permutation procedure that shuffles the phenotype labels, preserving the correlation structure among genes. This method is comprehensive as it maintains the complex interplay of gene-gene correlations, but it may be overly conservative when dealing with small sample sizes in one of the phenotype groups. 
+
+## Preranked GSEA
+
+It is a faster version of GSEA that uses a pre-ranked list of genes instead of calculating the ES from the original dataset. The preranked list of genes is generated by ranking all genes based on a gene-level statistic, such as fold change or t-statistic. Preranked GSEA involves two steps:
+
+1. Calculation of the Enrichment Score (ES): Similar to label-permuting GSEA, this score represents the degree to which a gene set is overrepresented at the extremes of a ranked list of genes.
+2. Estimation of the statistical significance of the ES: Unlike label-permuting GSEA, preranked GSEA uses gene label permutation to generate a null distribution of ESs. This procedure permutes the gene labels, which breaks gene-gene correlations. This method is less conservative and can be used if you have a small number of samples in one of your phenotype groups, but it does not maintain the correlation structure of the genes. This makes it a more computationally efficient approach.
+
+
+### Preranked GSEA concern
+
+Researchers have raised concerns about the pre-ranked version of Gene Set Enrichment Analysis (GSEA), suggesting that it may overstate statistical significance. This version of GSEA can yield highly significant pathway results even when comparing randomly selected groups of samples, which could lead to misleading conclusions.
+
+Interestingly, the pre-ranked version of GSEA has not been published or endorsed by the original authors of GSEA, possibly due to these concerns.
+
+The crux of the issue lies in the assumption made by pre-ranked GSEA that genes are independent entities. However, in reality, genes within pathways often exhibit positive correlations. Ignoring these correlations can lead to inflated significance levels. For instance, even minor positive correlations can result in true type I error rates around 40%, significantly higher than the expected 5%.
+
+This issue was demonstrated in a study (https://doi.org/10.1093/nar/gks461), which showed that methods assuming gene-wise independence could lead to erroneous results. Although pre-ranked GSEA was not included in the simulation in this study, it is expected that it would yield similar problematic results due to its assumption of gene independence.
+
+```{r GSEA analysis}
+
+#Run label-permuting gene set enrichment analysis
+gsea_res_perm=as.data.frame(fgseaLabel(
+  pathways=dbs_mmu_paths_l$PATHWAYS$pathways_l,
+  mat=mcpm,
+  labels=bin_contrast,
+  nperm=10000,
+  minSize = 2,
+  maxSize = 200,
+  nproc = 10
+))
+
+#Keep only the significant pathways
+gsea_res_perm=gsea_res_perm[order(gsea_res_perm$padj,-gsea_res_perm$ES,decreasing = FALSE),]
+gsea_res_perm=gsea_res_perm[gsea_res_perm$padj<=0.05,]
+paths_l[["GSEA_label"]]=gsea_res_perm
+
+#Run preranked gene set enrichment analysis
+stats=tT_ov$logFC
+names(stats)=rownames(tT_ov)
+gsea_res_rank=as.data.frame(fgsea(
+  pathways=dbs_mmu_paths_l$PATHWAYS$pathways_l,
+  stats=stats,
+  minSize = 2,
+  maxSize = 200,
+  nproc = 10
+))
+
+#Keep only the significant pathways
+gsea_res_rank=gsea_res_rank[order(gsea_res_rank$padj,-gsea_res_rank$ES,decreasing = FALSE),]
+gsea_res_rank=gsea_res_rank[gsea_res_rank$padj<=0.05,]
+paths_l[["GSEA_prerank"]]=gsea_res_rank
+
+```
+
+# StellarPath vs GSEA
+
+We compare the pathways found by the two methods.
+
+```{r comparison}
+#Find shared pathways
+shared_df=gsea_res_rank[gsea_res_rank$pathway %in% sp_res$pathways,]
+paths_l[["shared_paths"]]=shared_df
+write.table(shared_df$pathway,file="shared_paths.txt",quote=FALSE,row.names = FALSE,col.names = FALSE)
+#Find unique StellarPath pathways
+unique_sp_df=sp_res[!(sp_res$pathways %in% gsea_res_rank$pathway),]
+paths_l[["unique_SP"]]=unique_sp_df
+write.table(unique_sp_df$pathway,file="unique_SP.txt",quote=FALSE,row.names = FALSE,col.names = FALSE)
+#Find unique GSEA pathways
+unique_gsea_df=gsea_res_rank[!(gsea_res_rank$pathway %in% sp_res$pathways),]
+paths_l[["unique_GSEA"]]=unique_gsea_df
+write.table(unique_gsea_df$pathway,file="unique_GSEA.txt",quote=FALSE,row.names = FALSE,col.names = FALSE)
+
+#Extract stats
+how_many_v = c(
+  nrow(sp_res),
+  nrow(gsea_res_perm),
+  nrow(gsea_res_rank),
+  nrow(shared_df),
+  nrow(unique_sp_df),
+  nrow(unique_gsea_df)
+)
+names(how_many_v) = c(
+  "StellarPath",
+  "GSEA Label-Permutation",
+  "GSEA PreRank",
+  "Shared by StellarPath and PreRank",
+  "Unique StellarPath",
+  "Unique GSEA PreRank"
+)
+how_many_df = as.data.frame(how_many_v)
+how_many_df$Methods = rownames(how_many_df)
+colnames(how_many_df)[1] = "Number of Pathways"
+how_many_df = how_many_df[, c(2, 1)]
+paths_l[["stats"]] = how_many_df
+
+#Save
+writexl::write_xlsx(paths_l,path="StellarPath_vs_GSEA.xlsx")
+data_l[["SP_VS_GSEA"]]=paths_l
+qsave(data_l,file = out_res_path, nthreads = n_cores)
+
+knitr::kable(how_many_df)
+```
+
+# Shared Pathways
+
+The majority of these shared pathways are reasonably associated with Oxygen-Glucose deprivation. Hypoxia-related pathways are directly linked to low oxygen conditions, and metabolic pathways are consistent with cellular responses to energy stress. Inflammation and apoptosis pathways may reflect cellular stress and injury responses.
+
+```{r shared pathways, results='asis'}
+knitr::kable(shared_df[1:20,1:7])
+```
+
+# StellarPath unique pathways
+
+StellarPath seems to provide focused and relevant pathways that match with the expected biological processes affected by Oxygen-Glucose deprivation. While, it associates activated homeostatic cellular functions to Normoxia samples.
+
+```{r SP unique pathways, results='asis'}
+knitr::kable(unique_sp_df[1:20,])
+```
+
+# GSEA unique pathways
+
+GSEA is less focused and probably affected by over-estimation
+
+1. Pathways like response to hypoxia, cellular response to oxygen levels, and glucose metabolic process are clearly connected to OGD, as they reflect cellular responses to low oxygen and glucose deprivation.
+2. Some pathways, such as those related to apoptosis, angiogenesis, and cellular response to starvation, might be indirectly affected by OGD as secondary consequences.
+3. Several pathways, including those related to muscle development, organ morphogenesis, ion transport, and others, seem too generic or unrelated to OGD. While they might represent broad cellular responses, their direct relevance to OGD is less clear.
+
+```{r GSEA unique pathways, results='asis'}
+knitr::kable(unique_gsea_df[1:20,1:7])
+```
+
+In this vignette, StellarPath proven to be a more robust and insightful tool for investigating the complex biological responses of Oxygen-Glucose deprivation. The reasons can be summarized here:
+
+1. Relevance to OGD: The majority of the pathways identified by StellarPath are directly or indirectly associated with OGD. This includes pathways like inflammation, apoptosis, stress response, and immune regulation, which are known to be regulated by oxygen and glucose levels.
+2. Focused Results: Unlike GSEA that might include more generic or unrelated pathways, StellarPath provides more precise pathways that align with the samples in study. This focus eases the interpretability of the results and reduces the likelihood of false positives.
+3. Matching Biological Expectations: The pathways identified by StellarPath align well with known biological responses to deprivation conditions, suggesting that StellarPath is capturing genuine biological signals. This alignment adds confidence in the validity of the results.
+
+In conclusion, GSEA finds many pathways, some of them are clearly connected to OGD but many of them are generic or seemingly unrelated to the classes in comparison. Plus, the method does not provide further information to understand if the pathway is significantly deregulated by one specific class. Instead, StellarPath demonstrates a stronger performance in identifying pathways relevant to Oxygen-Glucose deprivation. Compared to GSEA, StellarPath focuses on pertinent pathways, minimizes the inclusion of unrelated ones and can recognize that the most generic ones are regulated by the Normoxia samples. StellarPath results are not only scientifically meaningful but also offer a strong base for further wet-lab validations and studies.
+
+We would like to draw attention to a specific detail concerning the preranked strategy in gene set enrichment analysis, a strategy widely used despite known concerns of over-estimation. This strategy has another hidden disadvantage. Let us consider a pathway where half of genes have a very high positive fold change, while the other half shows a very low negative fold change. Such a pattern would indicate that the pathway is strongly involved and deregulated in the case samples under study. However, tools employing the preranked strategy may fail to recognize this pathway as significant. The reason lies in the calculation of the enrichment score, which, in this scenario, would be close to zero, masking the pathway's true significance. This limitation derives from a lack of annotation in open databases such as GO, KEGG, and Reactome. They do not collect the direction of deregulation of the molecules (i.e., fold change) required to activate or inhibit a pathway. Consequently, it becomes challenging to assess the significance and regulation of a pathway when genes within it are both positively and negatively deregulated. StellarPath does not suffer the same disadvantage because it has to perform two further tests in order to consider a pathway as significant. While enrichment tools do not have other criteria to determine the pathway significance.

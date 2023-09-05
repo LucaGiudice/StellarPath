@@ -1,14 +1,16 @@
 ---
-title: 'Vignette_2: Data Visualization with TCGA KIRP LATE vs EARLY stage patients'
+title: "Vignette_2: Data Visualization with TCGA KIRP human study: LATE vs EARLY stage"
 output:
   html_document:
     theme: united
     toc: yes
-  pdf_document:
-    toc: yes
 vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
+```{=html}
 <style type="text/css">
 .main-container {
   max-width: 1800px;
@@ -22,6 +24,7 @@ code.r{ /* Code block */
     font-size: 14px;
 }
 </style>
+```
 
 ```{r, include = FALSE}
 #https://bookdown.org/yihui/rmarkdown/html-document.html
@@ -38,10 +41,10 @@ This vignette focuses on visualizing the data produced by StellarPath.
 We hope to provide some ideas on how to investigate and elaborate our method's results.
 
 ## Note
-Before checking this vignette, we suggest to go through Vignette_1.
-In this vignette, we will not describe each operation and the workflow.
-For some plots, we will limit the data to plot to create figures that fit in the html vignette.
-In a real application, we suggest to not subsample the data but to produce the plot in an independent pdf.
+Before checking this vignette, we suggest to go through the first vignette describing the workflow.
+In this vignette, we will skip the explanations about operations and focus on the data interpretation and visualization.
+In certain cases, we will limit the data to create figures that fit in the html vignette.
+In a real application, we suggest to plot all the data in an local pdf.
 
 ## Case study
 For this vignette, StellarPath is applied on a simple experimental study:
@@ -56,7 +59,10 @@ For this vignette, StellarPath is applied on a simple experimental study:
 
 # Enviroment set up
 Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
-Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+
+* Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+* Be careful: this vignette requires extra packages for plotting data
+
 
 ```{r setup}
 
@@ -69,7 +75,7 @@ gps0=getwd()
 gps0=paste(gps0,"/%s",sep="")
 rootDir=gps0
 setwd(gsub("%s","",rootDir))
-set.seed(5)
+set.seed(8)
 
 #Load libraries ----
 library("StellarPath")
@@ -92,23 +98,24 @@ out_res_path="classif_KIRP.qs"
 StellarPath is a binary classifier and works with one or multiple omics from high-throughput sequencing describing the two patient classes in comparison. For this vignette, we load the TCGA data that StellarPath includes in the package and extract the information about KIRP patients. Then, we run the main workflow on KIRP data.
 
 ```{r workflow}
-#Load and set up the example data ----
+#Load and set up the data
 data("tcga_p2_l")
 tcga_l=tcga_p2_l
 
-#Set name of the project, the specie id of the samples, the name of the classes to compare (case vs control)
-name_dataset="KIRP"
-tax_id=9606
-groups=c("LATE","EARLY")
+#Set application-dependent parameters
+name_dataset="KIRP" #Set name of the project
+tax_id=9606 #specie id of the samples
+groups=c("LATE","EARLY") #the name of the classes to compare (case vs control)
 
 #Start monitor RAM memory
 log_path=start_monitor_ram(name_dataset)
 #Start monitor running time
 startTime=Sys.time()
 
+#Feed the sequencing raw data to prepare_data function that checks and prepare the user's input
 data_l=prepare_data(info = tcga_l[[name_dataset]]$info[,c("patientID","pathologic_stage_binary")],
-                    groups_name = c("LATE","EARLY"),
-                    mRNA = tcga_l[[name_dataset]]$omics$RNASeq2Gene, 
+                    groups_name = groups,
+                    gex = tcga_l[[name_dataset]]$omics$RNASeq2Gene,
                     miRNA = tcga_l[[name_dataset]]$omics$miRNASeqGene,
                     mutations = tcga_l[[name_dataset]]$omics$Mutation,
                     tax_id = tax_id,
@@ -117,7 +124,7 @@ data_l=prepare_data(info = tcga_l[[name_dataset]]$info[,c("patientID","pathologi
 #Find the pathways that in the training data produce a significant PSN
 data_l=analyse_training(data_l)
 
-#Classify the testing patients based on the features/pathways learnt from the training
+#Classify the testing patients based on the significant pathway-based PSNs learnt from the training
 data_l=classify_testing(data_l)
 
 #End monitor resources
@@ -128,11 +135,11 @@ resources_l=list(runningTime=runningTime, max_ram=max_ram)
 data_l$performances$performances$name_dataset=name_dataset
 data_l[["performances"]]=c(data_l[["performances"]],resources_l)
 
-#Running time
+#Report the ending of the classification
 cat("Classification performed in", runningTime, "hours and with", max_ram, "GB of RAM")
 
-#Retrieve best pathways/target sets and their PSNs used in the classification
-data_l[["enrichment"]]=enrichment_analysis(data_l)
+#Retrieve best significant pathway-based PSNs with the predicted patients and the training results (best predictive markers)
+data_l=enrichment_analysis(data_l)
 
 #Save results
 qsave(data_l,file = out_res_path, nthreads = n_cores)
@@ -143,52 +150,46 @@ qsave(data_l,file = out_res_path, nthreads = n_cores)
 Let us extract the data and results produced by StellarPath
 
 ```{r data extraction}
-#Extract stable differential expression analysis about molecules (e.g. genes)
-sdr=data_l$enrichment$omics$gex$SDR
+#Extract differentially expressed and stable molecules (e.g. genes)
+significant_genes_df=data_l$enrichment$omics$gex$molecule_analysis
 
 #Extract and format the classification performance of the GCN with each significant pathway specific PSN
-perfsXpathway_dfs=rbindlist(data_l$performances$perfsXpathway_dfs)
+perfsXpathway_dfs=data_l$performances$perfsXpathway_dfs
 
-#Extract and format the significant pathway specific PSN
-transc=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_df
-muts=data_l$enrichment$pathway_analysis$mutations$top_pathways_df
-muts_extra=data.frame(code_db=rep(NA,nrow(muts)),
-                      name_db=rep(NA,nrow(muts)),
-                      pathways_targets=rep(NA,nrow(muts)),
-                      code_db_targets=rep(NA,nrow(muts)))
-muts=cbind(muts,muts_extra)
-paths=rbind(transc,muts)
+#Extract significant pathway specific PSN
+enriched_pathway_df=unique(data_l$enrichment$pathway_analysis$top_pathways_df[,seq(1,13)])
 
-#Extract how much each patient is central in the pathway specific PSNs of the transcriptomics data
-centralities=sapply(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l,function(x){
-  as.numeric(x$centrality)
-})
-rownames(centralities)=names(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[1]]$centrality)
-centralities=t(centralities)
-
-
+#Extract how much each patient is central in the pathway specific PSNs
+#Here we will extract the centrality of every patient in every significant pathway
+cts_l=list()
+for(i_path in 1:nrow(enriched_pathway_df)){
+    pathway_data_l=get_pathway_data(data_l,enriched_pathway_df$path2pathway[i_path])
+    cts_l[[i_path]]=pathway_data_l$centrality
+}
+cts_df=as.data.frame(data.table::rbindlist(cts_l,use.names = TRUE))
+rownames(cts_df)=enriched_pathway_df$pathways
 ```
 
 # Plot
-We can now start to produce the plots to visualize the data and results about the classification and the patients.
+We can now start to produce the plots and visualize the data about the classification and the patients.
 
 ## GCN performance per PSN
 We want to understand how much the GCN performed with each pathway specific PSN.
 
 ```{r performances, out.width = "100%", fig.align = "center"}
-
 perfsXpathway_dfs$dataset=name_dataset
 perfsXpathway_dfs$method="StellarPath"
-ggplot(perfsXpathway_dfs, aes(x=dataset, y=test_MCC, fill=method)) + 
+perfsXpathway_dfs=perfsXpathway_dfs[!is.na(perfsXpathway_dfs$test_mcc),]
+ggplot(perfsXpathway_dfs, aes(x=dataset, y=test_mcc, fill=method)) + 
   geom_violin(color="grey35",lwd=0.3,scale="width") +
-  scale_fill_manual(values = c('#f6b45e','#365b9f')) +
+  scale_fill_manual(values = c('#f6b45e')) +
   theme(text = element_text(size=7)) +
   labs(y = "Matthews correlation coefficient", x="TCGA datasets") +
   facet_grid(~ dataset, scales = "free") +
   theme(axis.ticks.x=element_blank(), axis.text.x=element_blank()) +
   ylim(0.5, 1)
 ```
-We can say that the GCN managed to predict very good the testing patients in most of the significant pathway specific PSNs involved in the different runs of cross-validation. This means that we can consider the results coming out this classification because pathways and molecules will be both deregulated and predictive.
+The GCN managed to predict very good the testing patients in most of the significant pathway specific PSNs involved in the different runs of cross-validation. This means that we can consider the results coming out this classification because pathways and molecules will be both deregulated and predictive.
 
 ## Pathway Ranking
 We plot the statistics of the significant pathway specific PSNs.
@@ -201,9 +202,11 @@ Precisely, we plot:
 * Group's cohesion: indicates the smallest similarity between the patients of the cohesive class
 
 ```{r ranking, results='asis', out.width = "100%", fig.align = "center", message=FALSE}
-x=paths[1:50,]
-x=x[order(x$power,decreasing = FALSE),]
+x=enriched_pathway_df
+x=x[order(x$power),]
+x=x[1:50,]
 x$pathways=factor(x$pathways,ordered = TRUE,levels = x$pathways)
+x=na.omit(x)
 ggplot(x, aes(y=pathways, x=power, color=regulation, shape=group, size=min_intra_STRONG)) +
   geom_point() + theme_bw() + 
   scale_color_manual(breaks = c("activated", "inhibited"), values=c("red", "blue")) +
@@ -214,37 +217,39 @@ ggplot(x, aes(y=pathways, x=power, color=regulation, shape=group, size=min_intra
 ```
 
 ## PSN graph plot
-From the previous plot, we see that EARLY cancer stage patients have activated the pathway "CELL KILLING" probably to limit the proliferation of the tumor. We want to see precisely the EARLY patients that have activated the pathway, so we plot the network.
+The TNFα signaling via NFκB pathway is involved in late cancer stage by promoting cancer cell migration and invasion1. The NFκB pathway is a key signaling pathway that regulates the expression of genes involved in inflammation, immunity, cellular homeostasis and tumour progression1. Excessive activation of the NFκB-signaling pathway has been documented in various tumor tissues2. KIAA1522 hyperactivates TNFα-NFκB signaling to facilitate resistance to platinum reagents. Targeting NFκB signaling through small molecule inhibitors may be a rational strategy to conquer chemoresistance and synergize platinum-based chemotherapy in KIAA1522 overexpressed lung adenocarcinomas3.
 
 ```{r PSN, results='asis', out.width = "100%", fig.align = "center", message=FALSE}
-#Extract informaiton about a pathway specific PSN of interest
-path_name="REGULATION OF CELL KILLING"
-knitr::kable(data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$stats)
+#Watch the stats of the pathway of interest
+path_name="HALLMARK_E2F_TARGETS"
+knitr::kable(enriched_pathway_df[enriched_pathway_df$pathways==path_name,])
 
-PSN=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$PSN
+#Retrieve the data of the pathway and its PSN
+data4path=get_pathway_data(data_l,enriched_pathway_df$path2pathway[enriched_pathway_df$pathways==path_name])
 info=data_l$enrichment$info
-pl_l=plot_PSN(info,PSN,k_clusters = 13,edge_threshold = 0.3,GLratio = 3)
+pl_l=plot_PSN(info,data4path$PSN,k_clusters = 10,edge_threshold = 0.4,GLratio = 3)
 ```
-It seems that the following EARLY patients are quite important for their class:
+The following LATE patients are the most important for their class:
 
-* EARLY.86
-* EARLY.9
-* EARLY.77
-* EARLY.1
-* EARLY.73
+* LATE.1
+* LATE.7
+* LATE.21
+* LATE.23
+* LATE.35
+* LATE.39
 
-While it seems that the patient EARLY.75 is not regulating the CELL KILLING as the other EARLY patients.
+While it seems that the patient LATE.26 is not regulating the pathway as the other LATE patients.
 At this point, we want to remember that StellarPath function represents only few patients in the network to visualize.
-This means that there can be other patients behind EARLY.75, let's see them.
+This means that there can be other patients behind LATE.26, let's see them.
 
 ```{r PSN outliers, results='asis'}
-pl_l$names_in_k_l$EARLY.79
+pl_l$names_in_k_l$LATE.26
 ```
 
-If we want to get the original names of the patient's samples which can be outliers for the CELL KILLING pathways:
+If we want to get the original names of the patient's samples which can be outliers for the pathways:
 
 ```{r PSN original names, results='asis'}
-plyr::mapvalues(pl_l$names_in_k_l$EARLY.79, from=info$IDs, to=rownames(info), warn_missing = FALSE)
+plyr::mapvalues(pl_l$names_in_k_l$LATE.26, from=info$IDs, to=rownames(info), warn_missing = FALSE)
 ```
 
 ## Molecular Markers
@@ -258,15 +263,15 @@ Precisely, we plot:
 
 ```{r Markers, results='asis',out.width = "100%", fig.align = "center", message=FALSE}
 #Extract the set of molecules that enriched the pathway of interest
-mls=data_l$enrichment$pathway_analysis$transcriptomics$top_pathways_l[[path_name]]$set
+mls=data4path$set
 #Extract the stats about the molecules
-sdr_mls=sdr[mls,]
+sdr_mls=significant_genes_df[mls,]
 sdr_mls$names=rownames(sdr_mls)
 
-ggplot(sdr_mls, aes(y=logFoldChange, x=Stability, color=Activity_EARLY)) +
+ggplot(sdr_mls, aes(y=logFoldChange, x=stability, color=activity_LATE)) +
   geom_point() + theme_bw() +
   labs(x="Stability", y="logFoldChange", 
-       color="Relative expression\n in EARLY class") +
+       color="Relative expression\n in LATE class") +
   theme(text = element_text(size=7)) +
   geom_label_repel(aes(label = names),
                    box.padding   = 0, 
@@ -274,8 +279,7 @@ ggplot(sdr_mls, aes(y=logFoldChange, x=Stability, color=Activity_EARLY)) +
                    size = 5, alpha=0.8, max.overlaps=5, label.size = NA, fill = "white",
                    segment.color = 'grey50')
 ```
-The gene STAP1 seems to be the most important deregulated markers in the CELL KILLING pathway for EARLY cancer stage patients.
-It is actually involved with their pathology: https://www.proteinatlas.org/ENSG00000035720-STAP1/pathology
+The gene MSC seems to be the most important deregulated markers in the pathway for LATE cancer stage patients.
 
 ## Centralities in pathway specific PSNs
 In the end, we also want to plot how much each patient is central in each pathway specific PSN.
@@ -284,14 +288,14 @@ For example, we have suclasses of LATE cancer stage patients if a large subset o
 
 ```{r centralities, out.width = "160%", fig.align = "center"}
 #We set up the annotation dataframe for the columns/samples in order to see their class in the plot
-classes=sub("\\..*", "",colnames(centralities))
-anno=data.frame(ids=colnames(centralities),classes=classes,samples="NA")
+classes=sub("\\..*", "",colnames(cts_df))
+anno=data.frame(ids=colnames(cts_df),classes=classes,samples="NA")
 rownames(anno)=anno$ids
 anno=anno[,-1]
 
 #We plot a subset of the centrality matrix to simplify the plot for the vignette
 pheatmap(
-  centralities[1:100,sample(seq(1,ncol(centralities)))[1:70]], scale = "row",
+  cts_df[,sample(seq(1,ncol(cts_df)))[1:70]], scale = "row",
   main=paste("StellarPath patient's centralities:",name_dataset),
   fontsize=8,
   fontsize_row=3.5,

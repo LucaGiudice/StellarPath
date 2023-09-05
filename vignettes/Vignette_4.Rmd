@@ -1,0 +1,199 @@
+---
+title: "Vignette_4: Pathway categorization and Similarity Measures"
+output:
+  html_document:
+    theme: united
+    toc: yes
+vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{=html}
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+body{ /* Normal  */
+      font-size: 18px;
+  }
+code.r{ /* Code block */
+    font-size: 14px;
+}
+</style>
+```
+
+```{r, include = FALSE}
+#https://bookdown.org/yihui/rmarkdown/html-document.html
+#https://stackoverflow.com/questions/30446905/rmarkdown-font-size-and-header
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  knitr::opts_chunk$set(warning = FALSE, message = TRUE)
+)
+```
+# StellarPath
+Welcome to the fourth vignette of our software StellarPath. 
+
+* This vignette focuses on the pathway categorization and similarity measure employed by StellarPath
+* This vignette is useful to understand how StellarPath labels a pathway according to the deregulated molecules falling into it
+* This vignette is useful to understand the differences and advantages of StellarPath measure of similarity wiith respect other standard measures
+
+## Note
+Before checking this vignette, we suggest to go through the first and second vignette describing the main workflow.
+This vignette is advanced, we will skip the explanations about operations and data, we will focus on the inference operation and results only.
+
+## Case study
+For this vignette, StellarPath will be applied on a dummy dataset:
+
+* We have: Dummy count matrix with 4 patients belonging to the first/case class and 6 patients belonging to the second/control class
+* We want: Find deregulated molecules and pathway
+* We want: Determine the category of the pathway
+* We want: Compute the PSN
+* We want: Compare the result obtained with StellarPath similarity measure with the result obtained using other measures
+
+# Enviroment set up
+Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
+
+* Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+
+```{r setup}
+
+#Clean workspace and memory ----
+rm(list=ls())
+gc()
+
+#Set working directory ----
+gps0=getwd()
+gps0=paste(gps0,"/%s",sep="")
+rootDir=gps0
+setwd(gsub("%s","",rootDir))
+set.seed(5)
+
+#Load libraries ----
+library("StellarPath")
+library("qs")
+library("data.table")
+library("plyr")
+
+```
+
+# Data creation
+For this vignette, we create a dummy dataset.
+
+```{r data}
+#Similarity measures in comparison
+sim_names=c("StellarPath","Euclidean","Pearson","Cosine")
+
+# Let's define a dummy count matrix (e.g. gene expression matrix)
+m = cbind(c(1,3,5),
+          c(10,13,15),
+          c(20,23,25),
+          c(50,51,52),
+          c(57,60,62),
+          c(58,61,63),
+          c(64,61,57),
+          c(60,63,65),
+          c(65,68,70),
+          c(70,73,75))
+
+# Assign column and row names to the matrix
+# Columns are patients
+# Rows are genes
+colnames(m)=paste("PAT",seq(1,ncol(m)),sep="")
+rownames(m)=paste("GENE",seq(1,nrow(m)),sep="")
+# Patient's classes
+# We assume that the first 4 patients belong to the CASE class and the last 6 to the CTRL class
+groups=c(rep("CASE",4),rep("CTRL",6))
+
+#Final dataset
+rbind(m,groups)
+
+```
+# Molecule analysis and Pathway categorization:
+
+All the genes are significatly downregulated (according to the standard interpretation of a DE analysis) but they are more stably expressed in the control case.
+As such, StellarPath attributes the pathway regulation to the control class which is actually upregulating the molecules.
+
+```{r find molecules}
+
+# Find significantly different molecules between groups
+find_SDR(m,groups)
+
+```
+
+# Simiality assessment and comparison:
+
+We calculate the patient similarity according to StellarPath measure, Euclidean distance, Pearson Correlation and Cosine similarity.
+We are going to analyse the similarities related to patient 5 (the first control patient). So we are going to rank the patients
+from the most similar to dissimilar from patient 5.
+
+```{r similarities}
+
+# Calculate similarity matrix using StellarPath's similarity measure
+sim_m0=build_PSN(m)
+# Apply a column rank
+sim_m0=apply(-sim_m0,2,rank)
+
+# Calculate similarity matrix using Euclidean distance
+dist_m=as.matrix(dist(t(m),upper = TRUE,diag = TRUE))
+sim_m1=1-(dist_m/max(dist_m))
+diag(sim_m1)=1
+# Apply a column rank
+sim_m1=apply(-sim_m1,2,rank)
+
+# Calculate similarity matrix using Pearson correlation
+sim_m2=cor(m)
+# Apply a column rank
+sim_m2=apply(-sim_m2,2,rank,ties.method="min")
+
+# Calculate similarity matrix using Cosine
+sim_m3=lsa::cosine(m)
+sim_m3=apply(-sim_m3,2,rank)
+
+# Let us compare how each patient is similar to the first patient based on the different measures
+sim_bench=cbind(sim_m0[,5],sim_m1[,5],sim_m2[,5],sim_m3[,5])
+colnames(sim_bench)=sim_names
+sim_bench=as.matrix(sim_bench)
+
+# Let us show the comparison
+as.data.frame(cbind(sim_bench,groups))
+```
+# Similarity Comparison
+
+1. PAT5 is correctly most similar to itself according to all the measures,
+However Pearson Correlation considers PAT5 similar in the same way to PAT2, PAT3, PAT6, PAT8, PAT9 and PAT10.
+2. PAT6 is correctly the second most similar patient to PAT5 for both StellarPath, Euclidean and Cosine similarity measures.
+3. According to StellarPath, PAT8 and PAT9 are more similar to PAT5 than PAT7. According to the Euclidean similarity, PAT7 and PAT8 are more similar to PAT5 than PAT9. According to Pearson Correlation, PAT7 is the most dissimilar to PAT5 because is anti-correled with respect PAT5. According to the Cosine similarity, PAT8 and PAT9 are more similar to PAT5 than PAT7. 
+  + StellarPath attributes a higher similarity to PAT8 and PAT9 because the pathway is upregulated, so higher is the average of the genes' values between two patients (PAT5-PAT8, PAT5-PAT9) and higher is their similarity. StellarPath attributes a lower similarity to PAT7 because is anti-correlated and neither very close or high with respect PAT5. 
+  + Euclidean similarity considers PAT7 more similar to PAT5 than PAT9 because the first two patients express the same genes with closer values. 
+  + Cosine similarity penalizes a lot PAT7 because of its anti-correlated profile with respect PAT5, in fact PAT7 is more dissimilar to PAT5 than PAT3 and PAT4 which are case patients. 
+4. According to StellarPath, PAT10 is the least similar control patient to PAT5 because the two patients have very distant values in the same genes. On the contrary of what happens with PAT8 and PAT9, PAT10 is not considered more similar to PAT5 than PAT7. The reason is that, StellarPath similarity measure is formulated as area of triangle where closeness and highness (in a upregulated pathways) of genes' expression values are equal contributors. As consequence, there is a limit to how much the high values of PAT10 can push the similarity with PAT5. The closeness of the genes' values of PAT7 with that ones of PAT5 has been considered more important than the highness of genes' values of PAT10. However still, StellarPath considers PAT10 more similar to PAT5 than all the case patients (PAT1,2,3,4) because the latter individuals have all expression profiles with lower values than PAT5. While according to the Euclidean similarity, PAT4 is more similar to PAT5 than PAT10 because the first two have more close expression values in the same genes.
+
+# Final Conclusions
+
+1) Pearson or correlation measures are not adequate to assess the similarity between patients described with omics data.
+As matter of fact, two patients could have completely different expression profiles but being considered strongly correlated and similar.
+2) StellarPath correctly associates PAT5 to the control patients, while separating PAT5 from case individuals.
+3) Euclidean and Cosine similarity are not designed to value how much two patient's profiles have high expression values in a upregulated pathway or low expression values in a downregulated pathway. As negative consequences, Euclidean similarity considers PAT5 more similar to PAT4 than to PAT10, and Cosine similarity considers PAT7 less similar to PAT5 than PAT3 and PAT4. 
+4) Euclidean similarity is not designed to weigh negatively profiles having opposite trends like PAT5 and PAT7.
+5) Cosine similarity is not designed to balance the closeness and the trend of values between two profiles like PAT5 and PAT7. 
+
+# Pearson Correlation
+
+The Pearson Correlation is a widely used measure to assess the linear relationship between two variables, it has been extensively used to evaluate how much genes are correlated among patient’s expression profiles, but it is not suitable for assessing the similarity between two gene expression profiles, especially in the context of sequencing data. Here's why:
+
+* Pearson Correlation is sensitive to outliers. In gene expression data, a single gene with an unusually high or low expression can significantly affect the correlation coefficient. This can lead to misleading conclusions about the overall similarity between two profiles.
+*	Pearson Correlation assumes a linear relationship between the two variables. Gene expression data often exhibit non-linear relationships, and the Pearson Correlation may not capture these complexities. This can result in an underestimation of the true relationship between two expression profiles.
+* Pearson Correlation is sensitive to the scale of the data. If the expression levels of genes in one profile are consistently higher or lower than in the other, the Pearson Correlation may indicate a strong correlation even if the patterns of expression are not similar. This can be problematic when comparing expression profiles across different conditions or treatments where the scale easily vary.
+* Pearson Correlation only considers the direction of the relationship, not the magnitude. Two profiles may have the same trend but different levels of expression. Pearson Correlation would consider these profiles similar, ignoring the potentially significant biological differences in expression levels.
+
+The Pearson Correlation is maily suited for assessing the correlation between genes:
+
+* In pathways, genes often work together. If two genes are part of the same biological process, their expression levels may change together in a coordinated way across different conditions or patient profiles. Pearson Correlation help identify co-expressed genes. In fact, Pearson Correlation is used to build gene co-expression networks. By identifying pairs of genes that are highly correlated.
+In conclusion, the popularity of Pearson Correlation in measuring how much two genes are correlated among patient profiles is due to its mathematical simplicity, interpretability, and applicability to the specific task of identifying linear relationships between genes. However, we believe that Pearson Correlation wrongly inheritated the capability of assessing properly the similarity between patients. 
+
+

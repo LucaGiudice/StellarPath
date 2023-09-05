@@ -1,9 +1,9 @@
-#' Determines the Power of a Patient Similarity Network
+#' Determines Separability Power of Patient Similarity Network
 #'
-#' Determines if the two groups of nodes in the network separate and how much
+#' Determines if the two groups of nodes in the network separate and how much.
 #'
 #' More a group has the intragroup similarities greater than the opposite intragroup similarities and
-#' intergroup similarities and more the power is close to 10
+#' intergroup similarities and more the power is close to 10.
 #'
 #' In order to understand the magnitude, a low percentile (e.g. 0.2) of the similarities of a group
 #' is tested if is greater than a high percentile (e.g. 0.8) of the other two sets of similarities.
@@ -11,7 +11,7 @@
 #' Lower is the low percentile and higher is the high percentile while still keeping a separability of
 #' the similarities and more the power is high.
 #'
-#' @param PSN Patient Similarity Network in Adjacent matrix format
+#' @param PSN Patient Similarity Network in adjacent matrix format
 #' @param groups character or factor vector of labels s.t. each label indicates the belonging of a sample to one group
 #' @return Dataframe indicating the group which nodes are more similar than the opposite, the power or magnitude measuring
 #' how much the strongest group is more similar than the others, the smallest similarity of the strongest group which is greater
@@ -112,16 +112,15 @@ test_power=function(PSN, groups, min_perc=0.3, max_perc=0.7){
   return(label)
 }
 
-#' Adjust intragroup similarities based on intergroup ones
+#' Adjust intra-group similarities based on inter-group ones
 #'
 #' Considers the similarity between two patients belonging to the same group, it increases this similarity if
-#' they have low interconnections with members of other groups, it lowers down this similarity if the opposite
+#' they have low similarities with members of other groups, it lowers down this similarity if the opposite
 #'
 #' @param PSN Patient Similarity Network in Adjacent Matrix format
 #' @param groups character or factor vector of labels s.t. each label indicates the belonging of a sample to one group
 #' @return Return the patient similarity with the weights between patients adjusted
 #' @export
-#'
 adjust_intra_sims=function(PSN, groups){
   adj_PSN=PSN
   for(gri in 1:2){
@@ -149,28 +148,29 @@ adjust_intra_sims=function(PSN, groups){
   return(adj_PSN)
 }
 
-#' Removes noise in a Patient Similarity Network
+#' Remove low similarities in a Patient Similarity Network
 #'
-#' For each group of nodes, it removes the cliques having the lowest average of weights
+#' For each group of nodes, it removes the cliques having the lowest average of similarities.
 #'
 #' @param PSN Patient Similarity Network in Adjacent Matrix format
 #' @param groups character or factor vector of labels s.t. each label indicates the belonging of a sample to one group
 #' @param n_comb Default 3, integer defining the size of the clique
 #' @param dir_sign Default 1, internal parameter of the software
-#' @param perc_filter Default 0.05, double between 0 and 1 defining the amount of cliques to remove because outliers
+#' @param perc_filter Default 0.05, double between 0 and 1 defining the amount of cliques to remove
 #' @return Return a sparse patient similarity network with the similarities of the lowest cliques equal to 0
 #' @importFrom Rfast comb_n
 #' @importFrom utils combn
 #' @export
-#'
-remove_outliers = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
-  #Adjust intragroup similarities by intergroup similarities
+remove_low_sim = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
+  dir_sign=abs(dir_sign)
+
+  #Adjust intra-group similarities by inter-group similarities
   aPSN=adjust_intra_sims(PSN=PSN, groups=groups)
   v=as.vector(aPSN)
   n=nrow(aPSN)
   m=ncol(aPSN)
 
-  #Determine the percentage of clique to filter for the two groups
+  #Determine the percentage of cliques to filter and to keep for the two groups
   if(dir_sign==1){
     perc_filter1=perc_filter
     perc_filter2=1-perc_filter
@@ -192,6 +192,7 @@ remove_outliers = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
     #Determine the similarities of a clique
     edges=combn(comb,2)
 
+    #Compute the avg of the similairites of a clique
     avg_edges=mean(apply(edges,2,function(x){
       i=x[1]
       j=x[2]
@@ -209,6 +210,7 @@ remove_outliers = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
     #Determine the similarities of a clique
     edges=combn(comb,2)
 
+    #Compute the avg of the similairites of a clique
     avg_edges=mean(apply(edges,2,function(x){
       i=x[1]
       j=x[2]
@@ -244,9 +246,9 @@ remove_outliers = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
   return(fPSN)
 }
 
-#' Determine a cohesive centrality score for each node a patient similarity network
+#' Get a cohesive centrality score for each patient in PSN
 #'
-#' Function which computes how much a node is connected to the members of its group, its non-members and then
+#' Function which computes how much a patient/node is connected to the members of its group, its non-members and then
 #' it produces a centrality score. Higher is the score and more a node is strongly connected to the members of its
 #' group and lowly connected to the non-members.
 #'
@@ -256,7 +258,6 @@ remove_outliers = function(PSN, groups, n_comb=3, dir_sign=1, perc_filter=0.05){
 #' @importFrom Rfast rowMedians
 #' @importFrom scales rescale
 #' @export
-#'
 get_cohesive_score = function(PSN, groups){
   #Find indexes of each group
   seq1cl=which(groups==unique(groups)[1])
@@ -323,4 +324,61 @@ convert_edg2adj<-function(el){
   mygraph <- igraph::graph.data.frame(el,directed = F)
   adj_mat=igraph::get.adjacency(mygraph, sparse = FALSE, attr=colnames(el)[3])
   return(adj_mat)
+}
+
+#' Extract subgraph from edge list
+#'
+#' This function takes an edge list representing a graph and the name of a node of interest and returns the subgraph formed by the node of interest and its neighbors, along with the information from the extra columns.
+#'
+#' @param el edge list representing the graph, with the first two columns indicating the name of the connected nodes, and any additional columns containing meta-information related to each edge.
+#' @param vx name of the node of interest in the graph
+#' @param order_neigh Default 1, integer indicating the order of the neighbors to include in the subgraph from the node of interest
+#' @return A data frame containing the edges of the subgraph formed by the node of interest and its neighbors, along with the information from the extra columns.
+#' @importFrom igraph graph_from_data_frame
+#' @importFrom igraph make_ego_graph
+#' @importFrom igraph as_data_frame
+#' @export
+get_subgraph =  function(el,vx,order_neigh=1){
+  # Create a graph object from the edge list
+  g <- igraph::graph_from_data_frame(d = el, directed = FALSE)
+
+  # Get subgraph composed by node of interest and its neighbors
+  sub_g <- igraph::make_ego_graph(g, order = order_neigh, nodes = vx)[[1]]
+
+  # Get edge list composed by edges of subgraph and information from extra columns
+  sub_el <- igraph::as_data_frame(sub_g, what = "edges")
+  return(sub_el)
+
+  #use https://rpubs.com/giancarlo_vercellino/spinner for plot
+}
+
+#' Set the most weak edges of each node to 0
+#'
+#' This function takes an adjacency matrix of a complete weighted graph and sets the weight of the most weak edges of each node to 0.
+#' The function assumes that the adjacency matrix is a square matrix with non-negative weights, and that the diagonal of the matrix is 0.
+#'
+#' @param adj_matrix A square matrix representing the adjacency matrix of a complete weighted graph. The weights should be non-negative, and the diagonal should be 0.
+#' @param th_cut default 0.5 (ranging from 0.1 to 0.9), threshold that determines which percentage of low values to set to 0
+#' @return A square matrix with the same dimensions as the input matrix, but with the weight of the most weak edges of each node set to 0.
+#' @export
+set_weak_edges_to_zero <- function(adj_matrix,th_cut=0.5) {
+  # Get the number of nodes
+  n <- nrow(adj_matrix)
+
+  # Set the upper diagonal values of the matrix to NA
+  adj_matrix[upper.tri(adj_matrix)] <- NA
+
+  # Calculate the thresholds for the 50% most weak edges for each node
+  thresholds <- apply(adj_matrix, 2, function(x) quantile(x, th_cut, na.rm = TRUE))
+
+  # Create a matrix of thresholds to compare with the adjacency matrix
+  threshold_matrix <- matrix(thresholds, nrow = n, ncol = n, byrow = TRUE)
+
+  # Set to 0 the 50% of the most weak edges
+  adj_matrix[adj_matrix < threshold_matrix] <- 0
+
+  # Replace the upper diagonal values of the matrix with the lower ones
+  adj_matrix[upper.tri(adj_matrix)] <- t(adj_matrix)[upper.tri(adj_matrix)]
+
+  return(adj_matrix)
 }

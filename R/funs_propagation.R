@@ -3,7 +3,7 @@
 #' Remove all the features/rows that don't have their name matching with a node inside the network
 #'
 #' @param counts Numeric matrix with rows matching nodes of the network
-#' @param net Adjacency matrix of a network s.t. nodes have same names of the rows in the profile matrix
+#' @param net Adjacency matrix of a network s.t. nodes have same names of the rows in the matrix of profiles
 #' @return The matrix of sample's profiles without the rows not having a match with a node of the network
 #' @export
 #'
@@ -43,13 +43,13 @@ harm_countsWnet = function(counts,net){
 #' Individually for each sample, the values of the features are projected on the corresponding nodes
 #' Individually for each sample, the values of the features are propagated through the network due to the node's connectivity
 #'
-#' @param net Undirect non-weighted network preferably like an adjacency matrix, it can be also edge list or igraph object
+#' @param net Adjacency matrix or Edge list of a non-directed non-weighted network/graph
 #' @param counts Numeric matrix of sample's profiles
 #' @param norm Default row, options: row or column or laplacian, it indicates the graph normalization performed on the network
-#' @param n_cores Default 2, An integer value greater than 0 indicating the number of cores to use for parallel computing
-#' @param r Default 0.8, A double value lower than 1 indicating the percentage of information that a gene keeps (0.8 is 80 percentage)
-#' @param stop_step Default 200, An integer value greater than 0 indicating the number of iterations of the propagation
-#' @param stop_delta Default 1e-06, A double value lower than 0 indicating the threshold under which all imputed propagation values are set 0
+#' @param n_cores Default 2, an integer value greater than 0 indicating the number of cores to use for parallel computing
+#' @param r Default 0.8, double value lower than 1 indicating the percentage of information that a gene keeps (0.8 is 80 percentage)
+#' @param stop_step Default 200, integer value greater than 0 indicating the number of iterations of the propagation
+#' @param stop_delta Default 1e-06, double value lower than 0 indicating the threshold under which all imputed propagation values are set 0
 #' @param keep_zero_profiles Default FALSE, Boolean: TRUE if to keep profiles without information
 #' @param keep_no_nodes Default FALSE, Boolean: TRUE if to keep profile's rows without node in the network
 #' @return Matrix of propagated sample's profiles
@@ -59,7 +59,7 @@ harm_countsWnet = function(counts,net){
 #' @importFrom  igraph get.adjacency
 #' @importFrom  igraph graph_from_edgelist
 #' @importFrom  igraph as_adjacency_matrix
-#' @import Rfast
+#' @importFrom Rfast rowsums
 #' @import data.table
 #' @import Matrix
 #' @import parallel

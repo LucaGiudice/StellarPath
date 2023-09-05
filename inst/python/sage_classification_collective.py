@@ -107,7 +107,7 @@ def node_classification(allNames,nodes_all,allEdges):
             )
 
             #Set the approaching for reaching the end of training
-            es_callback = EarlyStopping(monitor="val_acc", patience=50, restore_best_weights=True)
+            es_callback = EarlyStopping(monitor="val_acc", patience=10, restore_best_weights=True)
 
         #Train
         history = model.fit(

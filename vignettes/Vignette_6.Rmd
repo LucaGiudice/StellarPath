@@ -1,0 +1,403 @@
+---
+title: "Vignette_6: Data Inference with human study: AD vs Control classes"
+output:
+  html_document:
+    theme: united
+    toc: yes
+vignette: "%\\VignetteIndexEntry{Vignette} \n%\\VignetteEngine{knitr::rmarkdown} \n%\\VignetteEncoding{UTF-8}\n"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{=html}
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+body{ /* Normal  */
+      font-size: 18px;
+  }
+code.r{ /* Code block */
+    font-size: 14px;
+}
+</style>
+```
+
+```{r, include = FALSE}
+#https://bookdown.org/yihui/rmarkdown/html-document.html
+#https://stackoverflow.com/questions/30446905/rmarkdown-font-size-and-header
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  knitr::opts_chunk$set(warning = FALSE, message = TRUE)
+)
+```
+# StellarPath
+Welcome to the third vignette of our software StellarPath. 
+
+* This vignette focuses on inferring the class of new patients after that StellarPath has been trained with previous ones.
+* This vignette is useful when you trained and tested StellarPath on a known dataset and you want to use the predictive markers to predict the class of the patients described in a external dataset.
+
+## Note
+Before checking this vignette, we suggest to go through the first and second vignette describing the main workflow.
+This vignette is advanced, we will skip the explanations about operations and data, we will focus on the inference operation and results only.
+
+## Case study
+For this vignette, StellarPath is applied on a simple experimental study:
+
+* We have: Human samples divided into Alzheimer's disease and Control
+* We have: Two indipendent RNA sequencing datasets
+* We want: Find deregulated molecules, pathways and predictive pathways-specific PSNs between AD and Control patients in one known dataset
+* We want: Use the predictive pathways-specific PSNs to predict the class of new patients described in new datasets coming from indipendent studies
+
+# Enviroment set up
+Let us clean the R enviroment, set the working directory, load the software package, set the random seed generator for reproducing always the same results and define the number of cores available in the computer to run the operations.
+
+* Be careful: set up the number of cores based on your resources, if you are not secure how to, then just set equal to 2
+
+```{r setup}
+
+#Clean workspace and memory ----
+rm(list=ls())
+gc()
+
+#Set working directory ----
+gps0=getwd()
+gps0=paste(gps0,"/%s",sep="")
+rootDir=gps0
+setwd(gsub("%s","",rootDir))
+set.seed(5)
+
+#Load libraries ----
+library("StellarPath")
+library("qs")
+library("data.table")
+library("ggplot2")
+library("plyr")
+library("ggpubr")
+library("writexl")
+library("biomaRt")
+
+#' Convert ensemble gene names to gene symbols
+#'
+#' This function takes a vector of ensemble gene names and converts them to gene symbols using the Ensembl database. It retrieves the corresponding gene symbols and returns them as a named vector.
+#'
+#' @param ensemble_names A vector of ensemble gene names
+#' @importFrom biomaRt useMart
+#' @importFrom biomaRt getBM
+#' @importFrom plyr mapvalues
+#' @return A named vector of gene symbols corresponding to the ensemble gene names
+#' @examples
+#' ensemble_names <- c("ENSG00000149313", "ENSG00000139618", "ENSG00000105829")
+#' gene_symbols <- convert_ens2symbol(ensemble_names)
+#' print(gene_symbols)
+#' @export
+convert_ens2symbol <- function(ensemble_names) {
+  # Connect to the Ensembl database using the human dataset
+  ensembl <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl",  host="https://useast.ensembl.org")
+
+  # Get the gene symbols corresponding to the ensemble gene names
+  gene_symbols <- biomaRt::getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name"),
+    filters = "ensembl_gene_id",
+    values = ensemble_names,
+    mart = ensembl
+  )
+
+  gene_symbols=plyr::mapvalues(ensemble_names,from = gene_symbols$ensembl_gene_id,to=gene_symbols$external_gene_name)
+
+  # Return a named vector of gene symbols
+  return(gene_symbols)
+}
+
+
+#Set variables ----
+#Input
+#Set the number of cores available in the system
+n_cores=15
+#output
+#Set the output file where all the data and results will be stored in the end
+out_res_path="classif_AD.qs"
+out_plot_path="classif_AD.pdf"
+out_perfs_path="classif_AD.xlsx"
+```
+
+# Data set up
+
+StellarPath is a binary classifier and works with one or multiple omics from high-throughput sequencing describing the two patient classes in comparison. For this vignette, we load the human data describing AD patients that StellarPath extracts and prepares from Recount3 database.
+
+```{r recount data}
+#Load and set up the example data ----
+
+srp86=recount3::create_rse_manual(
+  project = "SRP181886",
+  project_home = "data_sources/sra",
+  organism = "human",
+  annotation = "gencode_v29",
+  type = "gene"
+)
+
+counts1=srp86@assays@data@listData[["raw_counts"]]
+info1=as.data.frame(srp86@colData)
+info1=info1[,seq(1,42)]
+sample_id=info1$external_id
+
+# Prepare gene expression matrix
+gene_names=convert_ens2symbol(remove_ending(rownames(counts1)))
+keep=sapply(gene_names,nchar)>1
+counts1=counts1[keep,]
+gene_names=gene_names[keep]
+rownames(counts1)=gene_names
+counts1=remove_duplicates(counts1,gene_names)
+
+# Prepare info dataframe
+info1=create_df4attr(info1$sra.sample_attributes)
+info1$sample_id=sample_id
+
+srp48=recount3::create_rse_manual(
+  project = "SRP100948",
+  project_home = "data_sources/sra",
+  organism = "human",
+  annotation = "gencode_v29",
+  type = "gene"
+)
+
+counts2=srp48@assays@data@listData[["raw_counts"]]
+info2=as.data.frame(srp48@colData)
+info2=info2[,seq(1,42)]
+sample_id=info2$external_id
+
+# Prepare gene expression matrix
+gene_names=convert_ens2symbol(remove_ending(rownames(counts2)))
+keep=sapply(gene_names,nchar)>1
+counts2=counts2[keep,]
+gene_names=gene_names[keep]
+rownames(counts2)=gene_names
+counts2=remove_duplicates(counts2,gene_names)
+
+# Prepare info dataframe
+info2=create_df4attr(info2$sra.sample_attributes)
+info2$sample_id=sample_id
+
+# Harmonize the two dataframes and check with counts
+info1=info1[,c(7,3,1,4)]
+info2=info2[,c(6,3,1,7)]
+colnames(info1)=colnames(info2)=c("ID","Status","Age","Sex")
+info1$Status[info1$Status!="control"]="AD"
+counts1=as.matrix(counts1[,info1$ID])
+info2$Status[info2$Status!="control"]="AD"
+counts2=as.matrix(counts2[,info2$ID])
+```
+
+# Training and Testing
+
+Here, we train and test StellarPath on the largest AD vs Control dataset.
+We run the main workflow based on cross-validation.
+
+```{r workflow}
+
+#Set name of the project, the specie id of the samples, the name of the classes to compare (case vs control)
+name_dataset="ADvsC"
+tax_id=9606
+groups=c("AD","control")
+
+data_l=prepare_data(info = info1[,c(1,2)],
+                    groups_name = groups,
+                    gex = counts1,
+                    tax_id = tax_id,
+                    n_cores = n_cores);tmp=gc();
+
+#Find the pathways that in the training data produce a significant PSN
+data_l=analyse_training(data_l)
+
+#Classify the testing patients based on the features/pathways learnt from the training
+data_l=classify_testing(data_l)
+
+#Retrieve best pathways/target sets and their PSNs used in the classification
+data_l=enrichment_analysis(data_l)
+qsave(data_l,file=out_res_path,nthreads = 15)
+
+```
+
+# Training results
+
+We have a look to the predictive and significant pathways/PSNs found between AD and Control classes.
+
+Alzheimer's disease (AD) is a neurodegenerative disorder characterized by the accumulation of extracellular amyloid-β (Aβ) and neurofibrillary tangles, leading to progressive synaptic and neuronal dysfunction [10]. StellarPath identified pathways that match and explain AD's key mechanisms. The JAK/STAT signaling pathway promotes neuroinflammation in neurodegenerative diseases such as Alzheimer [1] [6] [14]. The pathway known as POSITIVE REGULATION OF INNATE IMMUNE RESPONSE plays a role in the innate immune system and neuroinflammation in AD's pathogenesis [2] [7] [12]. The REGULATION OF SEQUESTERING OF CALCIUM ION pathway reveals that intracellular calcium regulation is vital for the proper cellular viability, and its dysregulation is a hallmark of AD [3] [8] [13]. The NEGATIVE REGULATION OF CELL-CELL ADHESION pathway affects how brain cells connect, contributing to the neuronal disruption observed in AD [4] [15]. Even the HALLMARK_ALLOGRAFT_REJECTION pathway is indirectly connected to the immune system when AD is deregulating [5]. Together, these pathways describe a coherent picture of how AD acts at the cellular level, where immune response, calcium balance, and cell connections are involved.
+
+[1] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9821184/
+[2] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7954128/
+[3] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7699688/
+[4] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6065556/
+[5] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8830081/
+[6] https://pubmed.ncbi.nlm.nih.gov/36614305/
+[7] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7783860/
+[8] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8124842/
+[9] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1876750/
+[10] https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2941917/
+[11] https://www.nature.com/articles/s41392-021-00791-1
+[12] https://journals.sagepub.com/doi/full/10.1177/17590914211051908
+[13] https://www.sciencedirect.com/science/article/pii/S2222180814606666
+[14] https://journals.sagepub.com/doi/10.1177/09727531211070532?icid=int.sj-full-text.similar-articles.7
+[15] https://doi.org/10.2147/DNND.S19829
+
+
+```{r cv resulting pathways, results='asis'}
+paths_df=data_l$enrichment$pathway_analysis$top_pathways_df
+knitr::kable(paths_df[,1:9])
+write.table(paths_df$pathways[paths_df$regulation=="activated" & paths_df$group==groups[1]],
+            file = "AD_act.txt",quote = FALSE,row.names = FALSE,col.names = FALSE)
+write.table(paths_df$pathways[paths_df$regulation!="activated" & paths_df$group==groups[1]],
+            file = "AD_inh.txt",quote = FALSE,row.names = FALSE,col.names = FALSE)
+
+```
+```{r plot cv resulting pathways, results='asis', out.width = "100%", fig.align = "center", message=FALSE}
+x=data_l$enrichment$pathway_analysis$top_pathways_df
+x=unique(x[order(x$power),1:12])
+x$pathways=factor(x$pathways,ordered = TRUE,levels = x$pathways)
+x=na.omit(x)
+
+#Create plot
+cv_paths_p=ggplot(x, aes(y=pathways, x=power, color=regulation, size=min_intra_STRONG)) +
+  geom_point() + theme_bw() + 
+  scale_color_manual(breaks = c("activated", "inhibited"), values=c("red", "blue")) +
+  labs(x="PSN's Separability Power", y="Pathway specific PSNs", 
+       color="Regulation Type", size="PSN's Class\ncohesion") +
+  theme(text = element_text(size=6.5)) +
+  scale_size(range = c(0, 2))
+
+#Visualize
+cv_paths_p
+
+```
+
+# Inference
+
+We now introduce external datasets with different patients.
+We combine the datasets (info and count matrices).
+We define the IDs of the patients previously used as training and the new ones to be predicted.
+We feed the prepared data to the function infer_new_data.
+
+```{r inference}
+#Assemble old and new data which patients' class must be infer
+info=rbind(info1[,c(1,2)],info2[,c(1,2)])
+gex=cbind(counts1,counts2)
+
+#Prepare the run's data to predict the class of specifically the new patients
+user_sets=list()
+user_sets[[1]]=list(train=info1[,1],test=info2[,1])
+
+data_l=infer_new_data(info, 
+                      groups_name=groups,
+                      gex=gex,
+                      tax_id=tax_id, 
+                      user_sets=user_sets, 
+                      data_l=data_l,
+                      n_cores=n_cores)
+
+#Save results
+qsave(data_l,file = out_res_path, nthreads = n_cores)
+```
+
+# Inference results
+
+We watch the predictions made for the new patients
+
+```{r inference results, results='asis'}
+#Info dataframe including the patients meta-information
+new_pats_indxs=grep("SRR53*",rownames(data_l$inference$run1$testing$info))
+knitr::kable(data_l$inference$run1$testing$info[new_pats_indxs,])
+```
+
+We watch which pathway specific PSN has been used to predict
+
+```{r inference results2, results='asis'}
+knitr::kable(data_l$inference$performances$perfsXpathway_dfs)
+```
+
+We produce the plot of the performances based on the pathway specific PSNs which have been used to predict
+
+```{r inference performances, out.width = "100%", fig.align = "center"}
+#Prepare data about classification performances ----
+#Extract and format the classification performance of the GCN with each PSN
+perfs=data_l$inference$performances$perfsXpathway_dfs
+perfs$method="StellarPath GCN"
+
+#Combine it with the Ensembl performance
+ens_perfs=apply(data_l$inference$performances$performances[,3:6],2,as.numeric)
+ens_perfs=rbind(ens_perfs,ens_perfs)
+ens_perfs1=perfs[1:nrow(ens_perfs),]
+ens_perfs1[,c(1,2,3,4,9,10,11)]=NA
+ens_perfs1[,5:8]=ens_perfs
+ens_perfs1$method="StellarPath Ensemble"
+perfs=rbind(perfs,ens_perfs1)
+perfs$dataset="AD"
+
+#Prepare the dataframe for the plot
+ord_methods=c("StellarPath GCN","StellarPath Ensemble")
+perfs$method <- factor(perfs$method ,levels = ord_methods, ordered = TRUE)
+
+#Plot
+inf_perf_p=ggplot(perfs, aes(x = dataset, y = test_mcc, fill = method, color = method, size = method)) +
+  geom_violin(scale = "width", position = position_dodge(width = 1)) +
+  scale_color_manual(values = c("grey30", "#19E82B")) + 
+  scale_fill_manual(values = c('#f6b45e','#19E82B')) +
+  scale_size_manual(values = c(0.1, 1.5)) +
+  theme(text = element_text(size = 8)) + theme_bw() + 
+  labs(y = "MCC", x = "datasets") +
+  facet_grid(~ dataset, scales = "free") +
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank()) +
+  ylim(0.7, 1) + 
+  stat_summary(fun.y = mean, mult = 1,
+               geom = "pointrange", color = "black",
+               position = position_dodge2(preserve = "single", 1, padding = 0.1), size = 0.02)
+
+#Print
+inf_perf_p
+```
+
+We plot and analyse the PSN of the CHEMOKINE-MEDIATED SIGNALING PATHWAY
+ upregulated in AD with all the patients
+
+```{r inference PSN, out.width = "100%", fig.align = "center"}
+
+#Get the pathway's data
+data2plot=get_pathway_data(data_l$inference,path2path = "enrichment$omics$gex$pathway_analysis$top_pathways_l$CHEMOKINE-MEDIATED SIGNALING PATHWAY")
+#Get the info and PSN
+info_inf=data_l$inference$run1$testing$info
+PSN=data2plot$PSN
+#Plot
+PSN_plot=plot_PSN(info_inf, PSN, edge_threshold = 0.5, k_clusters = 10, GLratio=3, file_path = "AD")
+#Subgroup of nodes
+PSN_subs=utils::stack(PSN_plot$names_in_k_l)
+```
+
+We export plots and results
+
+```{r save all results}
+#Save
+usage_plot = ggpubr::ggarrange(cv_paths_p, inf_perf_p, labels = c("A", "B"), ncol = 1, nrow = 2)
+
+ggsave(filename=out_plot_path, plot=usage_plot, 
+       width = 170, height=130, units="mm", 
+       dpi = 600, version="1.5")
+ggsave(filename=gsub("pdf","png",out_plot_path), plot=usage_plot, 
+       width = 170, height=130, units="mm", 
+       dpi = 600)
+
+#Report all the info
+wr_l=list()
+#Pathways found during cv training and testing
+wr_l[["AD_pathways"]]=data_l$enrichment$pathway_analysis$top_pathways_df
+#Performance of the pathways used for the inference
+wr_l[["AD_perfs"]]=data_l$inference$performances$perfsXpathway_dfs
+#Likelihood of how many pathway-specific PSNs/GCN predicted correctly each patient
+wr_l[["AD_likelihood"]]=data_l$inference$run1$testing$info
+#Subnodes in the PSN
+wr_l[["PSN_data"]]=PSN_subs
+#Write
+writexl::write_xlsx(wr_l, path = out_perfs_path)
+```
