@@ -62,8 +62,14 @@ We suggest to use the docker: ***lgiudice/py3_r4_bioinf:latest***. It has an Ubu
 
 There are the following vignettes:
 
-1. [Introduction to StellarPath's workflow, data and results](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_1.html)
-2. [Introduction to StellarPath's how to plot the data](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_2.html)
+1. [Introduction to StellarPath's cross-validation workflow, data and results](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_1.html)
+2. [Second application and visualization of results](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_2.html)
+3. [StellarPath's inference with CLL data](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_3.html)
+4. [StellarPath's pathway categorization and similarity measure](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_4.html)
+5. [StellarPath vs GSEA](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_5.html)
+6. [StellarPath's inference with AD data](https://htmlpreview.github.io/?https://github.com/LucaGiudice/supplementary-files/blob/main/sp/Vignette_6.html)
+7. [From sequencing data in fasta to count matrix tutorial](https://github.com/LucaGiudice/supplementary-files/blob/main/sp/From_fasta_to_count_matrix_tutorial.pdf)
+8. [From mutation data in VCF to BIN matrix tutorial](https://github.com/LucaGiudice/supplementary-files/blob/main/sp/From_VCF_to_BIN_matrix_tutorial.pdf)
 
 ## Workflow
 
