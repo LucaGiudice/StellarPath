@@ -17,5 +17,5 @@ see(m, r = 5, c = 5)
 Preview of a matrix like object
 }
 \description{
-Allows to quickly see the first rows and columns of a matrix like object
+Allows to quickly see the first rows and columns of a matrix-like object
 }

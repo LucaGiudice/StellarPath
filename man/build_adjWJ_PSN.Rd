@@ -4,16 +4,20 @@
 \alias{build_adjWJ_PSN}
 \title{Create Similarity Network based on Adjusted Weighted Jaccard similarity}
 \usage{
-build_adjWJ_PSN(m, comb2 = NULL)
+build_adjWJ_PSN(m, up = TRUE, comb2 = NULL)
 }
 \arguments{
-\item{m}{Numeric matrix of column profiles and row features (genes per samples)}
+\item{m}{Numeric matrix s.t. columns are objects, rows are features and a cell contains a value}
+
+\item{up}{Default TRUE, boolean that defines if the significant molecules are upregulated in a patient's group.}
+
+\item{comb2}{Default NULL, dataframe of iterator, index 1 and index 2 refering to the pair of columns to compute}
 }
 \value{
 Similarity Network based on Adjusted Weighted Jaccard function
 }
 \description{
-Determine which is the similarity between column profiles based on Adjusted Weighted Jaccard similarity
-Higher the variability of the same features between two profiles and lower is the similarity
-Smaller the variability of the same features between two profiles and higher is the similarity
+Determine which is the pairwise similarity between column profiles based on Adjusted Weighted Jaccard similarity.
+Higher the variability of the same features between two profiles and lower is the similarity.
+Smaller the variability of the same features between two profiles and higher is the similarity.
 }

@@ -17,19 +17,19 @@ get_propagated(
 )
 }
 \arguments{
-\item{net}{Undirect non-weighted network preferably like an adjacency matrix, it can be also edge list or igraph object}
+\item{net}{Adjacency matrix or Edge list of a non-directed non-weighted network/graph}
 
 \item{counts}{Numeric matrix of sample's profiles}
 
 \item{norm}{Default row, options: row or column or laplacian, it indicates the graph normalization performed on the network}
 
-\item{n_cores}{Default 2, An integer value greater than 0 indicating the number of cores to use for parallel computing}
+\item{n_cores}{Default 2, an integer value greater than 0 indicating the number of cores to use for parallel computing}
 
-\item{r}{Default 0.8, A double value lower than 1 indicating the percentage of information that a gene keeps (0.8 is 80 percentage)}
+\item{r}{Default 0.8, double value lower than 1 indicating the percentage of information that a gene keeps (0.8 is 80 percentage)}
 
-\item{stop_step}{Default 200, An integer value greater than 0 indicating the number of iterations of the propagation}
+\item{stop_step}{Default 200, integer value greater than 0 indicating the number of iterations of the propagation}
 
-\item{stop_delta}{Default 1e-06, A double value lower than 0 indicating the threshold under which all imputed propagation values are set 0}
+\item{stop_delta}{Default 1e-06, double value lower than 0 indicating the threshold under which all imputed propagation values are set 0}
 
 \item{keep_zero_profiles}{Default FALSE, Boolean: TRUE if to keep profiles without information}
 

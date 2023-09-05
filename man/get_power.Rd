@@ -2,12 +2,12 @@
 % Please edit documentation in R/funs_network_tools.R
 \name{get_power}
 \alias{get_power}
-\title{Determines the Power of a Patient Similarity Network}
+\title{Determines Separability Power of Patient Similarity Network}
 \usage{
 get_power(PSN, groups)
 }
 \arguments{
-\item{PSN}{Patient Similarity Network in Adjacent matrix format}
+\item{PSN}{Patient Similarity Network in adjacent matrix format}
 
 \item{groups}{character or factor vector of labels s.t. each label indicates the belonging of a sample to one group}
 }
@@ -18,11 +18,11 @@ than the biggest similarity of the opposite group and of the similarities betwee
 the power is 0 and the two groups do not show significant different trends of similarities.
 }
 \description{
-Determines if the two groups of nodes in the network separate and how much
+Determines if the two groups of nodes in the network separate and how much.
 }
 \details{
 More a group has the intragroup similarities greater than the opposite intragroup similarities and
-intergroup similarities and more the power is close to 10
+intergroup similarities and more the power is close to 10.
 
 In order to understand the magnitude, a low percentile (e.g. 0.2) of the similarities of a group
 is tested if is greater than a high percentile (e.g. 0.8) of the other two sets of similarities.

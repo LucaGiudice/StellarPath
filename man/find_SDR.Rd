@@ -2,54 +2,49 @@
 % Please edit documentation in R/funs_counts.R
 \name{find_SDR}
 \alias{find_SDR}
-\title{Find the specific differential role/expressed molecules between two groups}
+\title{Find significantly different molecules between groups}
 \usage{
-find_SDR(counts, groups, top_molecules_th = 0.05, force_directional = FALSE)
+find_SDR(counts, groups, top_molecules_th = 0.05)
 }
 \arguments{
-\item{counts}{count matrix of samples at the columns and molecules at the row (e.g. gene expression matrix)}
+\item{counts}{numeric count matrix of samples at the columns and molecules at the row (e.g. gene expression matrix)}
 
-\item{groups}{character or factor vector of labels s.t. each label indicates the belonging of a sample to one group}
+\item{groups}{character vector of groups' label s.t. each label indicates the belonging of a sample to one group}
 
-\item{top_molecules_th}{Default 0.1, double value of the molecules that are selected as best ones}
-
-\item{force_advanced}{Default FALSE, the best molecules are not labelled and divided based on their fold change.
-This means that a pathway/target set will be enriched for a set of molecules which fold change is not coordinate in one direction.
-Keep FALSE when the number of molecules composing the count matrix is small or when the direction of fold change does not matter.}
+\item{top_molecules_th}{Default 0.05, double value of the molecules that are selected as best ones}
 }
 \value{
-Dataframe of descriptive statistics related to the row molecules in a count matrix having two groups of samples in comparison
-logFoldChange measures the change in count values between first vs second group defined in the groups variable (unique(groups)[1] vs unique(groups)[2])
-Stability measures how much is differently stable in first vs second group (higher positive and more is stable for first group)
-Activity_1 shows the mean of the count values (rank or expression) in the first group
-Activity_2 shows the mean of the count values (rank or expression) in the second group
-Stable_for indicates in which sample group the molecule is stable for
-Significant indicates if the molecule has been tested significant
-Barcode is an internal variable used by the software to understand which test the molecule has passed to be significant
+Dataframe of descriptive statistics related to the molecules in a count matrix having two groups of samples in comparison
+
+- logFoldChange measures the change in count values between first vs second group defined in the groups variable (unique(groups)[1]
+vs unique(groups)[2])
+
+- stability measures how much is differently stable in first vs second group (higher positive and more is stable for first group)
+
+- activity_1 shows the mean of the count values (rank or expression) in the first group
+
+- activity_2 shows the mean of the count values (rank or expression) in the second group
+
+- stable_for indicates for which sample group the molecule is stable for
+
+- significant indicates if the molecule has been tested significant
+
+- sign_type identifies which test the molecule has passed to be significant.
+1)Positive lfc and low variation for class 1.
+2)Positive lfc and low variation for class 2.
+-1)Negative lfc and low variation for class 1.
+-2)Negative lfc and low variation for class 2.
 }
 \description{
-This function detects the different molecules between two groups based on the differential in standard deviation
-It computes the average of the values (ranks or expression) associated to a molecule in each group
-It computes the standard deviation of the values (ranks or expression) associated to a molecule in each group
-It ranks the molecules based on the difference in average and standard deviation between the two groups
-It selects the top 10% which the highest average and standard deviation because it means that:
-the molecule's values differ between the two groups
-the molecule's values are stable in one group but vary in the other
+Find significantly different molecules between groups evaluating both expression and stability.
+Label the significantly different molecules in four categories:
 }
 \details{
-The meaning of the selected molecules depends by how the count matrix has been normalized in "prepare_data" due to the
-variable "type".
+- Positive lfc and low variation for class 1
 
-By default is type "sample_rank": For each sample, a molecule is ranked based on its count value and then the ranks are 0-1 standardized.
-The most expressed molecule of a sample has the highest rank (e.g. 20000) divided by the number of molecules get 1
-The least expressed molecule get a value equal to 0. In this case, the selected molecules differ in how much they have
-been activated or silenced in each sample of the group with respect any other sample of the opposite group.
+- Positive lfc and low variation for class 2
 
-If type is "total_rank": a molecule is ranked based on its count value with respect all the count values in the matrix and then
-the ranks are 0-1 standardized. In this case, the selected molecules differ in how much they have been activated or
-silenced with respect all the other molecules in study.
+- Negative lfc and low variation for class 1
 
-If type is "expression": no transformation and standardization is applied. In this case, the
-result reflects the typical differential expression analysis. A selected molecule is up or down regulated with respect
-only the same molecule in the opposite group.
+- Negative lfc and low variation for class 2
 }

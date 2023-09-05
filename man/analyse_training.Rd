@@ -2,39 +2,57 @@
 % Please edit documentation in R/funs_wrappers.R
 \name{analyse_training}
 \alias{analyse_training}
-\title{Analyse the training set to get the best PSNs out of the omics}
+\title{Analyse training patients to find significant PSNs}
 \usage{
 analyse_training(
   data_l,
   max_size = 200,
-  min_elements = 6,
-  n_top_pathways = 50,
-  n_cores = 2,
-  keep_PSN = FALSE
+  min_elements = 5,
+  n_top_pathways = 100,
+  n_cores = NULL,
+  keep_PSN = FALSE,
+  ban = TRUE
 )
 }
 \arguments{
-\item{data_l}{The output list obtained from the processing of the user-defined data with the function: prepare_data}
+\item{data_l}{The output list obtained from processing of the user's data with the function: prepare_data}
 
-\item{max_size}{Default 150, integer value filtering out the pathways/sets with more elements than this threshold}
+\item{max_size}{Default 150, integer value filtering out the pathways with more elements than this threshold}
 
-\item{min_elements}{Default 4, integer value filtering out the pathways/sets containing less than this threshold of significant molecules}
+\item{min_elements}{Default 4, integer value filtering out the pathways containing less SIGNIFICANT molecules than this threshold}
 
-\item{n_cores}{Default 2, integer that set the number of cores to use for running the function in parallel}
+\item{n_cores}{Default 2, integer value that defines the number of cores to use for running the function in parallel}
 
-\item{keep_PSN}{Default FALSE, do not keep the PSN generated from a set of element}
+\item{keep_PSN}{Default FALSE, boolean that specifies to not keep the PSN generated from significantly enriched pathways}
 
-\item{n_top_sets}{Default 50, integer that set how many best sets/PSNs to retrieve}
+\item{ban}{Default TRUE, remove excessive context-specific pathways (e.g. "SOUND", "STABILIZATION", "ODONTOGENESIS", "PREGNANCY")}
+
+\item{n_top_sets}{Default 50, integer value that defines how many best pathways-specific PSNs to return as result}
 }
 \value{
-For each unique omic (e.g. gene expression), it provides a dataframe (SDR) which is a result of the function
-find_SDR, for example $TRAINING$gex$SDR. For each omic type (e.g. transcriptomics which can be combination of genes, lncRNAs and miRNAs), it adds
-a list of two elements in the $TRAINING$pathway_analysis$transcriptomics section of the data list: top_pathways_l and top_pathways_df
-top_pathways_df details the pathways/sets which have a significant PSN. The list is the result of the function find_PSN
+For each unique omic (e.g. gene expression), it provides:
+
+- the normalized count matrix
+
+- the SDR dataframe (obtained with find_SDR()) including the statistics of the molecules tested for separating the patient's groups.
+
+It also provide the result of the pathway analysis that combines the information of the different omics.
+Precisely, a list of two elements accessible with $training$pathway_analysis: top_pathways_l and top_pathways_df.
+
+- top_pathways_df contains meta-information about the significantly enriched pathways which have been used to build a significant PSN.
+
+- top_pathways_l is the list s.t. each element refers to a significantly enriched pathway and contains:
+
+1) the vector of significant molecules enriching the pathway
+
+2) the count matrix used to build the PSN
+
+3) statistics related to the PSN used to model the relationships between patients based on the specific pathway info
 }
 \description{
 For each omic, it determines the best molecules to build the PSNs.
 The molecules are fit into the pathways or regulatory target sets.
-A PSN is built for each pathway, is tested if separate the groups in comparison.
+StellarPath finds the most enriched pathways.
+A PSN is built for each pathway and is tested if separates the groups in comparison.
 If yes, the PSN is kept and used for the training and classification.
 }

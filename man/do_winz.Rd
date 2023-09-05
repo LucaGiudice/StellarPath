@@ -10,10 +10,19 @@ do_winz(m, groups, min = 0.05, max = 0.95)
 \item{m}{numeric matrix of samples divided in groups at the columns}
 
 \item{groups}{character or factor vector of labels s.t. each label indicates the belonging of a sample to one group}
+
+\item{min}{Default 0.1, double value indicating the minimum value of the distribution for the Winsorizing,
+it must be smaller than 1 and max value}
+
+\item{max}{Default 0.9, double value indicating the maximum value of the distribution for the Winsorizing,
+it must be smaller than 1 and greater than min value}
 }
 \value{
 Input winzorised numeric matrix
 }
 \description{
-This function performs Winsorizing of the row values based on column groups
+Winsorizing of the row values based on column groups
+}
+\details{
+https://www.r-bloggers.com/2011/06/winsorization/
 }

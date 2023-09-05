@@ -7,12 +7,12 @@
 build_avg_PWN(m, comb2 = NULL)
 }
 \arguments{
-\item{m}{Numeric matrix of column profiles and row features (genes per samples)}
+\item{m}{Numeric matrix s.t. columns are objects, rows are features and a cell contains a value}
 }
 \value{
 Similarity Network based on Average of Pair Weights
 }
 \description{
-For each pair of sample's profiles, it determines the average of the feature's values and then
-it determines their average to assign the score of similarity to the pair of samples.
+For each pair of column profiles, it determines the average of the feature's values and then
+it determines their average to assign the score of similarity to the pair of profiles.
 }

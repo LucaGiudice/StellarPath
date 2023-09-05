@@ -2,24 +2,26 @@
 % Please edit documentation in R/funs_wrappers.R
 \name{classify_testing}
 \alias{classify_testing}
-\title{Classify testing samples based on training and PSNs}
+\title{Classify testing patients based on training ones in top pathway-based PSNs}
 \usage{
-classify_testing(data_l, n_top_PSNs = 30, py_path = NULL)
+classify_testing(data_l, n_top_PSNs = 100, py_path = NULL, speed = "fast")
 }
 \arguments{
-\item{data_l}{The output list obtained from the processing of the user-defined data with the function: prepare_data and analyse_training}
+\item{data_l}{output list obtained from the processing of the user-defined data with the function: prepare_data and analyse_training}
 
-\item{n_top_PSNs}{Default 30, cutoff that defines how many PSNs to use for each omic (e.g. transcriptomics) to classify the testing samples}
+\item{n_top_PSNs}{Default 30, cutoff that defines how many PSNs to use to classify}
 
-\item{py_path}{Default package python script}
+\item{py_path}{character string of the path pointing to the python script with the implementation of the GCN}
+
+\item{speed}{Default fast, character string: fast/medium/slow that changes the parameters of the GCN to run on the PSNs, select according to how much time you want to allow a GCN to train}
 }
 \value{
-Updates the info dataframe in $TESTING$info based on the predictions made for the testing and validation samples.
-It adds a new list to $TESTING called classification which contains the dataframe perfsXpathway_df and the matthew correlation coefficent mcc_score.
-perfsXpathway_df is a dataframe that shows the performances of classification obtained with each pathway/target set/PSN.
-mcc_score is of double value between -1 and 1 representing the performance of classification.
+Updates the info dataframe in $testing$info based on the predictions made for the testing and validation samples.
+It adds a new list to $testing called classification which contains the dataframe perfsXpathway_df and the matthew correlation coefficent mcc_score.
+perfsXpathway_df is a dataframe that shows the performances of classification obtained with each pathway/PSN.
+mcc_score is a double value between -1 and 1 representing the performance of classification.
 }
 \description{
-For each run of cross-validation, extract the pathways/target sets/PSNs that are significant for training data.
-Generate the PSN, format it as edge list and pass the networks to the graph convolutional network for the training and prediction.
+For each run of cross-validation, extract the pathways/PSNs that are significant for training data.
+Generate the PSN, format it as edge list and pass the network to the graph convolutional network for the training and prediction.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/funs_counts.R
 \name{prepare_RNAseq}
 \alias{prepare_RNAseq}
-\title{Normalization and Rank transformation of RNAseq data}
+\title{Normalization and Standardization of RNAseq data}
 \usage{
 prepare_RNAseq(
   counts,
@@ -18,7 +18,7 @@ prepare_RNAseq(
 
 \item{groups}{Character vector, each element indicates the group of the sample in the same column position in m}
 
-\item{winz}{Default FALSE, not adjusting outliers by Winsorizing}
+\item{winz}{Default FALSE, boolean to indicate if to adjuste outliers with winsorizing}
 
 \item{min}{Default 0.1, double value indicating the minimum value of the distribution for the Winsorizing,
 it must be smaller than 1 and max value}
@@ -32,5 +32,5 @@ it must be smaller than 1 and greater than min value}
 Ratio transformed and library normalized count values
 }
 \description{
-Library normalize count values and then apply rank transformation
+Library normalization of count values and standardization with rank and ratio
 }

@@ -9,7 +9,7 @@ harm_countsWnet(counts, net)
 \arguments{
 \item{counts}{Numeric matrix with rows matching nodes of the network}
 
-\item{net}{Adjacency matrix of a network s.t. nodes have same names of the rows in the profile matrix}
+\item{net}{Adjacency matrix of a network s.t. nodes have same names of the rows in the matrix of profiles}
 }
 \value{
 The matrix of sample's profiles without the rows not having a match with a node of the network

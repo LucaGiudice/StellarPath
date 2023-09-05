@@ -2,7 +2,7 @@
 % Please edit documentation in R/funs_network_tools.R
 \name{get_cohesive_score}
 \alias{get_cohesive_score}
-\title{Determine a cohesive centrality score for each node a patient similarity network}
+\title{Get a cohesive centrality score for each patient in PSN}
 \usage{
 get_cohesive_score(PSN, groups)
 }
@@ -15,7 +15,7 @@ get_cohesive_score(PSN, groups)
 Matrix of values, first column indicates the median of the intraclass similarities,
 }
 \description{
-Function which computes how much a node is connected to the members of its group, its non-members and then
+Function which computes how much a patient/node is connected to the members of its group, its non-members and then
 it produces a centrality score. Higher is the score and more a node is strongly connected to the members of its
 group and lowly connected to the non-members.
 }

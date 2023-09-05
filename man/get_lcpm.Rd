@@ -2,7 +2,7 @@
 % Please edit documentation in R/funs_counts.R
 \name{get_lcpm}
 \alias{get_lcpm}
-\title{Library normalize a raw count matrix}
+\title{Normalization of RNAseq data}
 \usage{
 get_lcpm(
   counts,
@@ -20,7 +20,7 @@ get_lcpm(
 
 \item{filtering}{Default TRUE, removing row molecules with low counts on the overall samples}
 
-\item{winz}{Default FALSE, not adjusting outliers by Winsorizing}
+\item{winz}{Default FALSE, boolean to indicate if to adjuste outliers with winsorizing}
 
 \item{min}{Default 0.1, double value indicating the minimum value of the distribution for the Winsorizing,
 it must be smaller than 1 and max value}
@@ -32,5 +32,6 @@ it must be smaller than 1 and greater than min value}
 library normalized count matrix in lcpm
 }
 \description{
-This function filters, library normalizes and log transform count values with edgeR
+Library normalization and log trasformation of count values with edgeR
+We followed the guide https://f1000research.com/articles/5-1408
 }

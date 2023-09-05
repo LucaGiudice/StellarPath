@@ -3,23 +3,25 @@
 \docType{data}
 \name{ban_list}
 \alias{ban_list}
-\title{Vector of words banned to appear in the name of a pathway}
+\title{Vector of words used to ban pathways that are difficult to interpret}
 \format{
-Vector of words banned to appear in the name of a pathway
+Vector of words used to ban pathways that are difficult to interpret
 \describe{
-  \item{ban_list}{Vector of words banned to appear in the name of a pathway}
+  \item{ban_list}{Vector of words used to ban pathways that are difficult to interpret}
 }
 }
 \source{
 {
-  \url{experience}
+  \url{experience of using the pathway analysis}
 }
 }
 \usage{
 ban_list
 }
 \description{
-GO, KEGG, MSIGDB include pathways which are not informative or very context specific that would be
-strange to use in most of the analysis, this list is removed from the database
+GO, KEGG, MSIGDB include pathways which are not informative or are very context specific.
+Ban list includes terms like "SOUND", "STABILIZATION", "ODONTOGENESIS", "PREGNANCY"
+By default any pathway including such terms is not used in the analysis.
+The ban can also be avoided personalizing the function setting.
 }
 \keyword{datasets}

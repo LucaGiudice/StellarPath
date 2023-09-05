@@ -15,7 +15,7 @@ get_AUtri(b_value, c_value)
 Triangle area
 }
 \description{
-One is fixed (0,0), the second is (b_value,0), the third is (0,c_value)
-Triangle area increases more when two points increase
-Triangle area penalizes when only one point changes
+One is fixed (0,0), the second is (b_value,0), the third is (0,c_value).
+Triangle area increases more when two points increase.
+Triangle area penalizes when only one point changes.
 }

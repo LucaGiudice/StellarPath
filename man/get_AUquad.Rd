@@ -17,7 +17,7 @@ get_AUquad(b_value, c_value, d_value)
 Triangle area
 }
 \description{
-One is fixed (0,0), the second is (b_value,0), the third is (0,c_value), the fourth is (b_value,c_value)
-Quadrilateral area increases more when three points increase
-Quadrilateral area penalizes when only one point changes
+One is fixed (0,0), the second is (b_value,0), the third is (0,c_value), the fourth is (b_value,c_value).
+Quadrilateral area increases more when three points increase.
+Quadrilateral area penalizes when only one point changes.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/funs_network_tools.R
 \name{adjust_intra_sims}
 \alias{adjust_intra_sims}
-\title{Adjust intragroup similarities based on intergroup ones}
+\title{Adjust intra-group similarities based on inter-group ones}
 \usage{
 adjust_intra_sims(PSN, groups)
 }
@@ -16,5 +16,5 @@ Return the patient similarity with the weights between patients adjusted
 }
 \description{
 Considers the similarity between two patients belonging to the same group, it increases this similarity if
-they have low interconnections with members of other groups, it lowers down this similarity if the opposite
+they have low similarities with members of other groups, it lowers down this similarity if the opposite
 }
