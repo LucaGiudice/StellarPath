@@ -1,4 +1,4 @@
-# StellarPath: patient classifier <img src="[https://raw.githubusercontent.com/LucaGiudice/supplementary-files/main/sp/Logo.png](https://raw.githubusercontent.com/LucaGiudice/supplementary-files/main/sp/Logo.png)" width=350 align="right" />
+# StellarPath: patient classifier <img src="https://raw.githubusercontent.com/LucaGiudice/supplementary-files/main/sp/Logo.png" width=350 align="right" />
 
 ## Brief description
 
