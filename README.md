@@ -5,7 +5,7 @@
 StellarPath is a deep learning patient classifier which leverages state-of-the-art bioinformatics techniques to select biologically meaningful molecular and pathway features, the pathway space to integrate different omics and increase the software interpretability, the PSN paradigm to enable analysis and stratification of patients based on their pathway activity, and an artificial neural network to account for the similarity information and classify.
 
 ## Citation
-StellarPath: Patient Classifier Integrates Multi-Omics in Patient Similarity Networks for the Detection of Stable Markers and Signature Pathways. Authors: **Giudice Luca, Mohamed Ahmed and Malm Tarja**
+StellarPath: hierarchical-vertical multi-omics classifier synergizes stable markers and interpretable similarity networks for patient learning. Authors: **Giudice Luca, Mohamed Ahmed and Malm Tarja**
 
 ## Features
 
