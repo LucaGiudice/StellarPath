@@ -85,16 +85,21 @@ setwd("C:/Users/Luca/Downloads/StellarPath-main")
 install.packages(".", repos = NULL, type="source", dependencies = TRUE)
 ```
 
+### Installing Conda environment (automatically)
+
 Once the R package is installed, you can install the Python module.
 We recommend having Conda installed in the system but shouldn't be necessary.
-In case you want to install Conda, we recommend using Conda Navigator that is very easy to install.
-Our package will install a Conda environment that is independent.
+In case you would like to install Conda (and control the environment that StellarPath is going to install), we recommend using Conda Navigator which is very easy to install and use.
+The next operations with our package will install a Conda environment automatically.
+The Conda environment is needed to use graph convolutional neural networks which have been implemented in Python.
 
 ``` r
 library("StellarPath")
 SP_install() #check conda, if conda is missing installs automatically miniconda, then it installs the conda enviroment
 SP_initialize(save_profile = TRUE) # activate the conda enviroment that is needed to use the package
 ```
+
+### Loading
 
 The installation is completed, you can run StellarPath like this:
 
