@@ -110,6 +110,7 @@ setwd(gsub("%s","",rootDir))
 
 #Load libraries ----
 library("StellarPath")
+SP_initialize()
 library("qs")
 
 #Set variables ----
@@ -413,7 +414,7 @@ stats of its significant molecules:
 ```{r PSN table, results='asis'}
 #StellarPath provides access to the PSN associated to the pathway
 indx2pathway=which(data_l$enrichment$pathway_analysis$top_pathways_df$pathways=="HALLMARK_HYPOXIA")
-path2pathway=data_l$enrichment$pathway_analysis$top_pathways_df$path2pathway[indx2pathway]
+path2pathway=data_l$enrichment$pathway_analysis$top_pathways_df$path2pathway[indx2pathway[1]]
 data4pathway=get_pathway_data(data_l,path2pathway)
   
 knitr::kable(data_l$enrichment$omics$gex$molecule_analysis[data4pathway$set,])

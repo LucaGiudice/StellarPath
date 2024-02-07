@@ -79,6 +79,7 @@ set.seed(8)
 
 #Load libraries ----
 library("StellarPath")
+SP_initialize()
 library("qs")
 library("data.table")
 library("ggplot2")

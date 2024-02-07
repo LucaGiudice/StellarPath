@@ -75,6 +75,7 @@ set.seed(5)
 
 #Load libraries ----
 library("StellarPath")
+SP_initialize()
 library("qs")
 library("data.table")
 library("plyr")
